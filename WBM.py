@@ -78,6 +78,7 @@ def extract_data_from_col(data, columns, col, scale_factor, nan_fill=False):
         else:
             val = data[cell_id].to_numpy()
         
+        val = val.astype('float64')
         val[val==None] = np.nan
         return val * scale_factor, cell_id
 
