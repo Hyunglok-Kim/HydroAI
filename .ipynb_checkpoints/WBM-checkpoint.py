@@ -670,7 +670,7 @@ def f_R(asm, p, d, K1, K2):
 def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', event_opt='P_dry_period'):
     idata = 0
     valid = 0
-
+    offset = 0
     if p.shape[0] > 30:
         
         n_draws = 1000
