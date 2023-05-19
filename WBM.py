@@ -1062,9 +1062,11 @@ def plot_dSM_sumP(col, dSM, sumP, TR_argument, event_opt, ax=None):
         event = event_opt
 
     if isinstance(dt, str):
-        title = "Location #{} \n".format(col) + r'$\Delta$t = {:.0f}-hr / {}'.format(dt, event)
-    else:
         title = "Location #{} \n".format(col) + r'$\Delta$t = {}-hr / {}'.format(dt, event)
+        
+    else:
+        title = "Location #{} \n".format(col) + r'$\Delta$t = {:.0f}-hr / {}'.format(dt, event)
+        
     ax.set_title(title, fontsize=20)
 
     # Fit a first-order regression line
