@@ -1,0 +1,5 @@
+setup.py
+hydroAI.egg-info/PKG-INFO
+hydroAI.egg-info/SOURCES.txt
+hydroAI.egg-info/dependency_links.txt
+hydroAI.egg-info/top_level.txt
