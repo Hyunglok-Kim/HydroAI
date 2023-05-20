@@ -911,6 +911,34 @@ def make_idata_list(save_dir):
             f.append(file)
     return f
 
+def delete_bad_cell_id(directory, bad_cell_id):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            for cell_id in bad_cell_id:
+                if file.startswith(cell_id):
+                    file_path = os.path.join(root, file)
+                    os.remove(file_path)
+                    
+def check_idata(idata_save_dir):
+    idata_list = make_idata_list(idata_save_dir)
+    bad_cell_id = []
+    
+    for i in range(len(idata_list)):
+
+        try:
+            data = []
+            with open(idata_save_dir+idata_list[i], "rb") as f:
+                while True:
+                    try:
+                        data.append(pickle.load(f))
+                    except EOFError:
+                        break
+        except:
+            bad_cell_id.append(idata_list[i].split("_")[0])
+    bad_cell_id = list(map(int, bad_cell_id))
+    
+    return bad_cell_id 
+
 def extract_posterior(save_dir, idata_file_name, var_name):
     #print(save_dir+idata_file_name)
     
