@@ -915,7 +915,7 @@ def delete_bad_cell_id(directory, bad_cell_id):
     for root, dirs, files in os.walk(directory):
         for file in files:
             for cell_id in bad_cell_id:
-                if file.startswith(cell_id):
+                if file.startswith(str(cell_id)):
                     file_path = os.path.join(root, file)
                     os.remove(file_path)
                     
