@@ -9,7 +9,19 @@ from datetime import datetime, timedelta
 import time
 # libs for probabilistic modeling
 # pymc
-import pymc as pm
+
+try:
+    import pymc3 as pm
+    import theano.tensor as tt
+    pmv = 3
+except ImportError:
+    import pymc as pm
+    import tensorflow_probability as tfp
+    tt = tfp.math
+    pmv = 5
+    
+#print("PyMC version:", pm.__version__)
+
 import bisect
 
 #strong data
@@ -174,7 +186,7 @@ def compute_filtered_event_indices(rescaled_SM, x_v_events, x_v_event_indices, P
 def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, case, event_opt, P_threshold, plot_pi=False):
     # Create mask for valid indices
     mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2:
+    if case == 2 or case == 4:
         mask &= ~np.isnan(R)
     elif case == 3:
         mask &= ~np.isnan(R) & ~np.isnan(ET)
@@ -263,7 +275,7 @@ def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, case, event_op
     sumP = np.array([np.sum(P[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])    
     dt = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
 
-    if case == 2:
+    if case == 2 or case == 4:
         sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
     if case == 3:
         sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
@@ -284,7 +296,7 @@ def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, case, event_op
         'P_end_idx': P_end_indices
     })
 
-    if case == 2:
+    if case == 2 or case == 4:
         df['sumR']  = sumR
     if case == 3:
         df['sumR']  = sumR
@@ -301,7 +313,7 @@ def find_wetup(rescaled_SM, P, R, ET, case, P_threshold, threshold_condition=1, 
     
     # Create mask for valid indices
     mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2:
+    if case == 2 or case == 4:
         mask &= ~np.isnan(R)
     elif case == 3:
         mask &= ~np.isnan(R) & ~np.isnan(ET)
@@ -366,7 +378,7 @@ def find_drydown(rescaled_SM, P, R, ET, case, P_threshold=0.01):
     # Create mask for valid indices
 
     mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2:
+    if case == 2 or case == 4:
         mask &= ~np.isnan(R)
     elif case == 3:
         mask &= ~np.isnan(R) & ~np.isnan(ET)
@@ -433,7 +445,7 @@ def make_df_for_event(rescaled_SM, P, R, ET, JDATES, case, P_threshold=0.01, eve
     sumP = np.array([np.sum(P[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])    
     dt = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
 
-    if case == 2:
+    if case == 2 or case == 4:
         sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])                 
     if case == 3:
         sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])
@@ -539,7 +551,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
                     "SM2", "dSM", "dt", 
                     "sumP", 'start_idx','end_idx',
                     "P_start_idx", "TR_it_id"]
-    if case == 2:
+    if case == 2 or case == 4:
         column_names.append('sumR')
     if case == 3:
         column_names.append('sumR')
@@ -568,7 +580,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
             
         else:
             mask = (~np.isnan(SSM_save[ii])) & (SSM_save[ii] > 0) & (SSM_save[ii] < 1) & (~np.isnan(P))
-            if case == 2:
+            if case == 2 or case == 4:
                 mask &= ~np.isnan(R)
             elif case == 3:
                 mask &= ~np.isnan(R) & ~np.isnan(ET)
@@ -579,8 +591,8 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
 
             dt       = np.float32((v_jdates[1:] - v_jdates[:-1]).astype('timedelta64[h]'))
             sumP     = np.add.reduceat(P, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
-            if case == 2:
-                sumR = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit                         
+            if case == 2 or case == 4:
+                sumR = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
             if case == 3:
                 sumR = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
                 sumET = np.add.reduceat(ET, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
@@ -603,7 +615,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
                 P_start_idx = t_dsm_idx
                 
                 t_list = [t_t1, t_t2, t_SM1, t_SM2, t_dSM, t_dt, t_sumP, start_idx, end_idx, P_start_idx, ii]
-                if case == 2:
+                if case == 2 or case == 4:
                     t_sumR = sumR[t_dsm_idx]
                     t_list.append(t_sumR)
 
@@ -632,7 +644,6 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
     df = df.drop_duplicates()
     
     df = df.reset_index(drop=True)
-    
     return df, SSM_save, P, R, noscale_SSM_NLDAS, cell_id
 
 def make_input(df, case):
@@ -651,9 +662,11 @@ def make_input(df, case):
         r      = pd.to_numeric(df.sumR).values # mm/dt
         et     = pd.to_numeric(df.sumET).values # mm/dt
     asm        = 0
-                         
-    if (case == 4) | (case == 5):
-        asm    = pd.to_numeric(df.SM1).values
+     
+    if case == 4:
+        r      = pd.to_numeric(df.sumR).values # mm/dt
+    #if (case == 4) | (case == 5):
+    #    asm    = pd.to_numeric(df.SM1).values
 
     return p, dsm, SM1, SM2, dt, r, et, asm, infilt
 
@@ -665,8 +678,29 @@ def f_R(asm, p, d, K1, K2):
     R_est = d*(p**K1)*(asm**K2)
     return R_est
 
+if pmv == 3:
+    def logp_zero_inflated_exponential(value, psi, mu):
+        return tt.switch(tt.eq(value, 0), tt.log(psi), tt.log1p(-psi) - mu * value)
+
+#if pmv == 5:
+#    def logp_zero_inflated_exponential(value, psi, mu):
+#      if value == 0:
+#        return pm.math.log(psi)
+#      else:
+#        return pm.math.log1p(-psi) - mu * value
+
+
+if pmv == 5:
+    from pytensor.tensor import TensorVariable
+    def logp_zero_inflated_exponential(value: TensorVariable, psi: TensorVariable, mu: TensorVariable) -> TensorVariable:
+      if value == 0:
+        return np.log(psi)
+      else:
+        return np.log1p(-psi) - mu * value
+          
 # Infilt might be an incorrect term
 # Instead, the percoloation term may be used
+
 def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', event_opt='P_dry_period'):
     idata = 0
     valid = 0
@@ -684,11 +718,12 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
             a = 0
             b = 0
             
-            if case == 1 or case == 2:
+            if case == 1 or case == 2 or case == 4:
                 # ET + D = a*avgSM^b*dt
                 a  = pm.HalfNormal('α', sigma=1000) # weak informative prior (we know it should be positive) 
-                b  = pm.Normal('β', mu=0, sigma=1000, initval=0)
-
+                #b  = pm.Normal('β', mu=0, sigma=1000, initval=0)
+                b  = pm.Normal('β', mu=0, sigma=1000, testval=0)
+                
             # Q ~ d*(P^K1)*(SM^K2)
             d  = 0
             K1 = 0
@@ -761,13 +796,16 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # We do not need to add the offset since we assumed the Normal dist for the likelihood fn.
                     #####
                     offset   = 0
-                    y_obs    = np.abs(dsm)                                    
+                    #y_obs    = np.abs(dsm)                                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu       = (ET_I_est)/z
-                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    #mu       = (ET_I_est)/z
+                    #Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+
+                    mu = -z*np.abs(dsm) + ET_I_est
+                    Y_obs = pm.Normal('Y_obs', mu=mu, sigma=1, observed=np.zeros_like(dsm))
                     
                 if case == 2:
-                    #####
+                    ##### old
                     # With the case-2, the decrease in SM is due to R+ET+I
                     # P = -z*|dSM| + ET + I + R
                     # This case, we use estimated ET+I from f_et_i(SM), obs R, and assume P=0.
@@ -776,11 +814,35 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # However, in this case, if R=0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to R.
                     #####
-                    offset   = np.min(r) - 1e-10
-                    y_obs    = r - offset
+                    #offset   = np.min(r) - 1e-10
+                    #y_obs    = r-offset
+                    #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    #mu       = z*np.abs(dsm) - ET_I_est
+                    #Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+
+                    ##### enw
+                    # With the case-2, the decrease in SM is due to R+ET+I
+                    # P = -z*|dSM| + ET + I + R
+                    # This case, we use estimated ET+I from f_et_i(SM), obs R, and assume P=0.
+                    # 0 = -z*|dSM| + f_et_i(s) + R
+                    # R = z*|dSM| - f_et_i(SM)
+                    # However, we have a lot of 0 in R data. It indicates the presence of excess zeros 
+                    # that cannot be adequately explained by a standard continuous distribution. In such 
+                    # cases, considering a zero-inflated exponential continuous distribution can be 
+                    # beneficial.
+                    # This only works with pymc3 version.
+                    #####
+                    psi = pm.Beta('psi', 1, 1)
+                    offset = 0# np.min(r)
+                    r[r<=0] = 0
+                    y_obs = r #-offset
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu       = z*np.abs(dsm) - ET_I_est
-                    Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    mu = z*np.abs(dsm) - ET_I_est
+                
+                    # Zero-Inflated Exponential likelihood
+                    # This only works with pymc version 3.x
+                    Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
+                                           observed={'value': y_obs, 'psi': psi, 'mu': mu})
                     
                 if case == 3:
                     #####
@@ -797,6 +859,26 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     mu       = z*np.abs(dsm)
                     Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
+                if case ==4: # case 4 is for testing code
+                    # Probability of zero inflation
+                    psi = pm.Beta('psi', 1, 1)
+                    offset = np.min(r)# - 1e-10
+                    y_obs = r-offset
+                    ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    mu = z*np.abs(dsm) - ET_I_est
+                
+                    # Zero-Inflated Exponential likelihood
+                    if pmv == 3:
+                        Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
+                                               observed={'value': y_obs, 'psi': psi, 'mu': mu})
+                    elif pmv == 5:
+                        #Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
+                        #                       observed=np.array([y_obs, psi, mu]))
+
+                        #Y_obs = pm.CustomDist('Y_obs', logp=logp_zero_inflated_exponential, 
+                        #                      observed={'value': y_obs, 'psi': psi, 'mu': mu})
+                        Y_obs = pm.CustomDist('Y_obs', psi, mu, dist=logp_zero_inflated_exponential, observed=y_obs)
+    
         # sampling or fit
         rng = 321
         if method == 'nuts':
@@ -816,7 +898,7 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
     else:
         print('Not enough data to fit')
     return idata, valid, offset
-        
+
 def save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id):
     t_file_name = cell_id+'_c_'+str(case)+'_m_'+method+'_tr_'+str(TR)+'_gn_'+str(GN_std)
     file_exists = exists(save_dir+t_file_name)
@@ -827,7 +909,14 @@ def save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id):
     file = open(save_dir+t_file_name, 'wb')
     pickle.dump(valid, file)
     pickle.dump(cell_id, file)
-    pickle.dump(idata, file)
+
+    parameter_names = ['Z', 'α', 'β']
+    parameter_values = []
+    for parameter_name in parameter_names:
+        values = idata.get_values(parameter_name)
+        parameter_values.append({parameter_name: values})
+
+    pickle.dump(parameter_values, file)
     pickle.dump(lam, file)
     file.close()
     
@@ -865,6 +954,92 @@ def fitting(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, method, TR, GN_std, 
         return idata, valid, lam, df
 
 ### idata-related codes
+def make_idata_list(save_dir):
+    f = []
+    for file in os.listdir(save_dir):
+        if os.path.isfile(os.path.join(save_dir, file)) and file[0].isdigit():
+            f.append(file)
+    return f
+
+def extract_posterior_v2(save_dir, idata_file_name, var_name):
+    #print(save_dir+idata_file_name)
+    
+    try:
+        data = []
+        with open(save_dir+idata_file_name, "rb") as f:
+            while True:
+                try:
+                    data.append(pickle.load(f))
+                except EOFError:
+                    break
+
+        valid_point = data[0]
+        cell_id = data[1]
+        idata = data[2]
+        if valid_point == 1:
+            var = idata[0][var_name]
+        else:
+            #print(str(cell_id), ' is not a valid point')
+            var = [np.nan]
+    except:
+        #print(idata_file_name)
+        print(idata_file_name, ' is not a valid point')
+        var = [np.nan]
+        cell_id = 85
+        valid_point = 0
+        idata = np.nan
+    
+    return var, cell_id, valid_point, idata
+    
+def extract_posterior(save_dir, idata_file_name, var_name):
+    #print(save_dir+idata_file_name)
+    
+    try:
+        data = []
+        with open(save_dir+idata_file_name, "rb") as f:
+            while True:
+                try:
+                    data.append(pickle.load(f))
+                except EOFError:
+                    break
+
+        valid_point = data[0]
+        cell_id = data[1]
+        idata = data[2]
+
+        if valid_point == 1:
+            if isinstance(idata, list):
+                var = idata[0][var_name]
+            else:
+                var = idata.posterior[var_name]
+        else:
+            #print(str(cell_id), ' is not a valid point')
+            var = [np.nan]
+    except:
+        #print(idata_file_name)
+        print(idata_file_name, ' is not a valid point')
+        var = [np.nan]
+        cell_id = np.nan
+        valid_point = 0
+        idata = np.nan
+    
+    return var, cell_id, valid_point, idata
+
+def calculate_hdi(idata, hdi_prob=0.94, hdi_type='lower'):
+    sorted_data = np.sort(idata)
+    n_samples = len(sorted_data)
+    n_intervals = int(hdi_prob * n_samples)
+
+    if hdi_type == 'lower':
+        hdi_indices = np.arange(n_intervals)
+    elif hdi_type == 'higher':
+        hdi_indices = np.arange(n_samples - n_intervals, n_samples)
+    else:
+        raise ValueError("Invalid hdi_type. Choose 'lower' or 'higher'.")
+
+    hdi_values = sorted_data[hdi_indices]
+    return hdi_values
+    
 def extract_idata(idata_save_dir, lat, opt='median'):
     
     logging.getLogger("arviz").setLevel(logging.ERROR)
@@ -882,15 +1057,27 @@ def extract_idata(idata_save_dir, lat, opt='median'):
         Z_temp=[0]*len(idata_list)
         for i in range(len(idata_list)):
             if Z_valid[i] == 1:
-                if opt == 'median':
-                    Z_temp[i] = np.median(Z[i].values)
-                elif opt == 'hdi_low':
-                    Z_samples = az.hdi(idata[i].posterior['Z'], hdi_prob=0.94)
-                    Z_temp[i] = Z_samples['Z'].sel(hdi='lower').values
+                z = Z[i]
+                
+                if not isinstance(z, np.ndarray):
+                    z = z.values
 
-                elif opt == 'hdi_high':
-                    Z_samples = az.hdi(idata[i].posterior['Z'], hdi_prob=0.94)
-                    Z_temp[i] = Z_samples['Z'].sel(hdi='higher').values
+                    if opt == 'median':
+                        Z_temp[i] = np.median(z)
+                    elif opt == 'hdi_low':
+                        Z_samples = az.hdi(idata[i].posterior['Z'], hdi_prob=0.94)
+                        Z_temp[i] = Z_samples['Z'].sel(hdi='lower').values
+    
+                    elif opt == 'hdi_high':
+                        Z_samples = az.hdi(idata[i].posterior['Z'], hdi_prob=0.94)
+                        Z_temp[i] = Z_samples['Z'].sel(hdi='higher').values
+                else:
+                    if opt == 'median':
+                        Z_temp[i] = np.median(z)
+                    elif opt == 'hdi_low':
+                        Z_temp[i] = calculate_hdi(z, hdi_prob=0.94, hdi_type='lower')
+                    elif opt == 'hdi_high':
+                        Z_temp[i] = calculate_hdi(z, hdi_prob=0.94, hdi_type='higher')
             else:
                 Z_temp[i] = np.nan 
 
@@ -903,13 +1090,6 @@ def extract_idata(idata_save_dir, lat, opt='median'):
     Z_map.flat[cell_id_python] = Z_temp
     
     return Z_map
-
-def make_idata_list(save_dir):
-    f = []
-    for file in os.listdir(save_dir):
-        if os.path.isfile(os.path.join(save_dir, file)) and file[0].isdigit():
-            f.append(file)
-    return f
 
 def delete_bad_cell_id(directory, bad_cell_id):
     for root, dirs, files in os.walk(directory):
@@ -937,38 +1117,7 @@ def check_idata(idata_save_dir):
             bad_cell_id.append(idata_list[i].split("_")[0])
     bad_cell_id = list(map(int, bad_cell_id))
     
-    return bad_cell_id 
-
-def extract_posterior(save_dir, idata_file_name, var_name):
-    #print(save_dir+idata_file_name)
-    
-    try:
-        data = []
-        with open(save_dir+idata_file_name, "rb") as f:
-            while True:
-                try:
-                    data.append(pickle.load(f))
-                except EOFError:
-                    break
-
-        valid_point = data[0]
-        cell_id = data[1]
-        idata = data[2]
-
-        if valid_point == 1:
-            var = idata.posterior[var_name]
-        else:
-            #print(str(cell_id), ' is not a valid point')
-            var = [np.nan]
-    except:
-        #print(idata_file_name)
-        print(idata_file_name, ' is not a valid point')
-        var = [np.nan]
-        cell_id = 85
-        valid_point = 0
-        idata = np.nan
-    
-    return var, cell_id, valid_point, idata
+    return bad_cell_id
 
 def Midx2Pidx(matlab_indices, matlab_shape):
     matlab_indices = np.array(matlab_indices) - 1  # Account for 1-based indexing
