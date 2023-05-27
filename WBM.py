@@ -510,13 +510,15 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
     
     # rescale SM
     SSM_save, noscale_SSM_NLDAS, TR_it, masking_day, sample_rate = rescale_SM(SSM_SMAPL3, SSM_NLDAS, P, TR_argument)
-
+    SSM_save_or = SSM_save.copy()
+    
     # add Gaussian noise
     for i in range(TR_it):
-        GN                       = np.random.normal(0, GN_std, sum(~np.isnan(SSM_save[i])))
-        valid_point              = np.argwhere(~np.isnan(SSM_save[i]))
-        SSM_save[i][valid_point] = SSM_save[i][valid_point] + GN.reshape(-1,1)
-
+        GN                          = np.random.normal(0, GN_std, sum(~np.isnan(SSM_save[i])))
+        valid_point                 = np.argwhere(~np.isnan(SSM_save[i]))
+        SSM_save[i][valid_point]    = SSM_save[i][valid_point] + GN.reshape(-1,1)
+        #SSM_save_or[i][valid_point] = 
+        
     column_names = ['t1', 't2', 'SM1', 
                     'SM2', 'dSM', 'dt', 
                     'sumP',  'sumR', 'sumET',
@@ -584,10 +586,8 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
     #df = df[df.sumP > P_threshold]
 
     if event_opt != 'P_dry_period':
-            print(event_opt)
             res = df.sumP - 100*np.abs(df.dSM) - (df.sumR + df.sumET)
     else:
-            print(event_opt)
             res = 100*np.abs(df.dSM) + df.sumP - (df.sumR+df.sumET)
     df['res'] = res
     
@@ -634,14 +634,6 @@ if pmv == 3:
     def logp_zero_inflated_exponential(value, psi, mu):
         return tt.switch(tt.eq(value, 0), tt.log(psi), tt.log1p(-psi) - mu * value)
 
-#if pmv == 5:
-#    def logp_zero_inflated_exponential(value, psi, mu):
-#      if value == 0:
-#        return pm.math.log(psi)
-#      else:
-#        return pm.math.log1p(-psi) - mu * value
-
-
 if pmv == 5:
     from pytensor.tensor import TensorVariable
     def logp_zero_inflated_exponential(value: TensorVariable, psi: TensorVariable, mu: TensorVariable) -> TensorVariable:
@@ -661,23 +653,13 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
         
         n_draws = 1000
         n_tune  = 1000
-        
         with pm.Model() as model:
-            
-            # Z*dsm
-            z  = pm.HalfNormal('Z', sigma=500)
-            
-            a = 0
-            b = 0
-            
-            if case == 1 or case == 2 or case == 4:
-                
-                # ET + D = a*avgSM^b*dt
-                a  = pm.HalfNormal('α', sigma=1000) # weak informative prior (we know it should be positive) 
-                if pmv == 3:
-                    b  = pm.Normal('β', mu=0, sigma=1000, testval=0)
-                if pmv == 5:
-                    b  = pm.Normal('β', mu=0, sigma=1000, initval=0)
+            # ET + D = a*avgSM^b*dt
+            a  = pm.HalfNormal('α', sigma=10) # weak informative prior (we know it should be positive) 
+            if pmv == 3:
+                b  = pm.Normal('β', mu=0, sigma=10, testval=0)
+            if pmv == 5:
+                b  = pm.Normal('β', mu=0, sigma=10, initval=0)
                 
             # Q ~ d*(P^K1)*(SM^K2)
             d  = 0
@@ -705,6 +687,7 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     # However, in this case, if P = 0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to P.
                     #####
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = -1e-10
                     y_obs    = np.abs(dsm)
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
@@ -720,6 +703,7 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     # However, in this case, if P-R = 0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to P - R.
                     #####
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = 0
                     y_obs    = np.abs(dsm)
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
@@ -746,30 +730,34 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
                     
                 if case == 4:
-                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
-                    offset    = 0# np.min(p-r-et-res) - 1e-10
-                    y_obs     = p - r - et - res - offset
-                    log_y_obs = np.log(y_obs)
-                    log_dSM   = np.log(np.abs(dsm)) 
-                    
-                    mu     = log_Z + log_dSM
-                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
-                    
-                if case == 5:
                     #####
-                    # With the case-2, the summation of p is ummation of z*|dSM| and R+ET+I.
-                    # P = z*|dSM| + ET + I + R
-                    # This case, we use the estimated ET+I from f_et_i(SM), obs R.
-                    # P - R = z*|dSM| + f_et_i(s)
-                    # However, in this case, if P-R = 0, we cannot use the lognormal for the likelihood fn.
-                    # Thereroe, we add the offset factor 1e-10 to P - R.
+                    # With the case-4, the summation of p is ummation of z*|dSM| and R+ET+I+etc.
+                    # P = z*|dSM| + ET + I + R + etc.
+                    # This case, we use estimated ET+I from f_et_i(SM), obs R P, and etc.
+                    # z*|dSM| = P - (R + f_et_i(s) - et + res): because res term include true et.
+                    # |dSM|   = (P - (R + f_et_i(SM) - et + res))/z
+                    # This case shows how incorrect physcis in f_et_i affect z.
                     #####
+ 
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = 0
                     y_obs    = np.abs(dsm)
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
                     mu       = (p - (r + ET_I_est - et + res))/z 
                     #mu       = (p - (r + ET_I_est + res))/z #this proves that this approach is correct!
                     Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                     
+                if case == 'true':
+                    #####
+                    #This is the true case. np.exp(log_Z) must be 100.
+                    #####
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    offset    = np.min(p - r - et - res) - 1e-10
+                    y_obs     = p - r - et - res - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm)) 
+                    mu     = log_Z + log_dSM
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
                     
             else:
 
@@ -781,7 +769,9 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     # 0 = -z*|dSM| + f_et_i(SM)
                     # |dSM| = f_et_i(SM)/z
                     # We do not need to add the offset since we assumed the Normal dist for the likelihood fn.
+                    # This case shows how missing constraints and incorrect physcis in f_et_i affect z.
                     #####
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = 0
                     y_obs    = np.abs(dsm)                                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
@@ -789,47 +779,34 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
                 if case == 2:
-                    ##### old
-                    # With the case-2, the decrease in SM is due to R+ET+I
-                    # P = -z*|dSM| + ET + I + R
-                    # This case, we use estimated ET+I from f_et_i(SM), obs R, and assume P=0.
-                    # 0 = -z*|dSM| + f_et_i(s) + R
-                    # R = z*|dSM| - f_et_i(SM)
-                    # However, in this case, if R=0, we cannot use the lognormal for the likelihood fn.
-                    # Thereroe, we add the offset factor 1e-10 to R.
                     #####
-                    #offset   = np.min(r) - 1e-10
-                    #y_obs    = r-offset
-                    #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    #mu       = z*np.abs(dsm) - ET_I_est
-                    #Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
-
-                    ##### enw
-                    # With the case-2, the decrease in SM is due to R+ET+I
+                    # With the case-2, the decrease in SM is due to R + ET + I
                     # P = -z*|dSM| + ET + I + R
-                    # This case, we use estimated ET+I from f_et_i(SM), obs R, and assume P=0.
-                    # 0 = -z*|dSM| + f_et_i(s) + R
-                    # R = z*|dSM| - f_et_i(SM)
-                    # However, we have a lot of 0 in R data. It indicates the presence of excess zeros 
-                    # that cannot be adequately explained by a standard continuous distribution. In such 
-                    # cases, considering a zero-inflated exponential continuous distribution can be 
-                    # beneficial.
-                    # This only works with pymc3 version.
+                    # This case, we use estimated ET+I from f_et_i(SM), obs R and P.
+                    # z*|dSM| = R + f_et_i(s) - P
+                    # |dSM| = (R + f_et_i(SM) - P)/z
+                    # This case shows how missing constraints and incorrect physcis in f_et_i affect z.
                     #####
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = 0
                     y_obs    = np.abs(dsm)                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
                     mu       = (r + ET_I_est - p)/z
                     #mu = (r + et - p + res)/z #this proves that this approach is correct!
-                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
 
+                    ### old (pymc3 version)
+                    # However, we have a lot of 0 in R data. It indicates the presence of excess zeros 
+                    # that cannot be adequately explained by a standard continuous distribution. In such 
+                    # cases, considering a zero-inflated exponential continuous distribution can be 
+                    # beneficial.
+                    # This only works with pymc3 version.
                     #psi = pm.Beta('psi', 1, 1)
                     #offset = 0# np.min(r)
                     #r[r<=0] = 0
                     #y_obs = r #-offset
                     #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
                     #mu = z*np.abs(dsm) - ET_I_est
-                
                     ## Zero-Inflated Exponential likelihood
                     ## This only works with pymc version 3.x
                     #Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
@@ -842,10 +819,12 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     # This case, we use both obs for R and E, and assume P=0 and I=0.
                     # 0 = -z*|dsm| + ET + R
                     # ET+R = z*|dsm|
-                    # However, in this case, if R+ET<=0, we cannot use the lognormal for the likelihood fn.
-                    # Thereroe, we add the offset factor 1e-10 to min(ET+R).               
+                    # However, in this case, if R+ET<=0, we cannot use the log transform.
+                    # Thereroe, we add the offset factor 1e-10 to min(ET+R).
+                    # This case shows how missing constraints affects z.
+                    # But, Obs ET might not represent ET from the top 10cm soil layer.
+                    # So, This can can be "weak" wrong physics compared to cases 1 and 2.
                     #####
-
                     log_Z     = pm.Normal('log_Z', mu=0, sigma=10)
                     offset    = np.min(r+et) - 1e-10
                     y_obs     = r + et - offset
@@ -854,48 +833,35 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi
                     mu        = log_Z + log_dSM
                     Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
                     
-                    #offset   = np.min(r+et) - 1e-10
-                    #y_obs    = r + et - offset
-                    #mu       = z*np.abs(dsm)
-                    #Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
-                    
-                if case ==4: # case 4 is for testing code
-                    
-                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
-                    offset    = 0 #np.min(r + et + res - p) - 1e-10
-                    y_obs     = r + et + res - p - offset #p - r - et - res - offset
-                    log_y_obs = np.log(y_obs)
-                    log_dSM   = np.log(np.abs(dsm)) 
-                    
-                    mu     = log_Z + log_dSM
-                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
-                    
-                    # Probability of zero inflation
-                    #psi = pm.Beta('psi', 1, 1)
-                    #offset = np.min(r)# - 1e-10
-                    #y_obs = r-offset
-                    #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    #mu = z*np.abs(dsm) - ET_I_est
-                
-                    # Zero-Inflated Exponential likelihood
-                    #if pmv == 3:
-                    #    Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
-                    #                           observed={'value': y_obs, 'psi': psi, 'mu': mu})
-                    #elif pmv == 5:
-                        #Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
-                        #                       observed=np.array([y_obs, psi, mu]))
-
-                        #Y_obs = pm.CustomDist('Y_obs', logp=logp_zero_inflated_exponential, 
-                        #                      observed={'value': y_obs, 'psi': psi, 'mu': mu})
-                    #    Y_obs = pm.CustomDist('Y_obs', psi, mu, dist=logp_zero_inflated_exponential, observed=y_obs)
-
-                if case ==5: # case 5 is for testing code
+                if case ==4:
+                    #####
+                    # With the case-4, the decrease in SM is due to R + ET + I + etc.
+                    # P = -z*|dSM| + ET + I + R + etc.
+                    # This case, we use estimated ET+I from f_et_i(SM), obs R P, and etc.
+                    # z*|dSM| = R + f_et_i(s) - et + res - P: because res term include true et.
+                    # |dSM| = (R + f_et_i(SM) - et + res - P)/z
+                    # This case shows how incorrect physcis in f_et_i affect z.
+                    #####
+                    z  = pm.HalfNormal('Z', sigma=500)
                     offset   = 0
                     y_obs    = np.abs(dsm)                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
                     mu       = (r + ET_I_est - et + res - p)/z
                     #mu = (r + et - p + res)/z #this proves that this approach is correct!
                     Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    
+                if case == 'true':
+                    #####
+                    #This is the true case. np.exp(log_Z) must be 100.
+                    #####
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    offset    = np.min(r + et + res - p) - 1e-10
+                    y_obs     = r + et + res - p - offset #p - r - et - res - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm)) 
+                    
+                    mu     = log_Z + log_dSM
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
                     
         # sampling or fit
         rng = 321
@@ -927,16 +893,20 @@ def save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id):
         t_file_name = 'bad_'+t_file_name
 
     elif valid == 1:    
-        parameter_names = ['Z', 'α', 'β']
-        
-        for parameter_name in parameter_names:
-            if pmv == 3:
-                values = idata.get_values(parameter_name)
-            if pmv == 5:
-                values = idata.posterior.Z[0].values
-                
-            parameter_values.append({parameter_name: values})
 
+        if pmv == 3:
+            if case == 3 or case == 'true':
+                parameter_names = ['Z', 'α', 'β']
+            else:
+                parameter_names = ['log_Z', 'α', 'β']
+                
+            for parameter_name in parameter_names:
+                values = idata.get_values(parameter_name)
+                parameter_values.append({parameter_name: values})
+      
+        if pmv == 5:
+            parameter_values = idata
+            
     file = open(save_dir+t_file_name, 'wb')
     pickle.dump(valid, file)
     pickle.dump(cell_id, file)
@@ -986,36 +956,6 @@ def make_idata_list(save_dir):
             f.append(file)
     return f
 
-def extract_posterior_v2(save_dir, idata_file_name, var_name):
-    #print(save_dir+idata_file_name)
-    
-    try:
-        data = []
-        with open(save_dir+idata_file_name, "rb") as f:
-            while True:
-                try:
-                    data.append(pickle.load(f))
-                except EOFError:
-                    break
-
-        valid_point = data[0]
-        cell_id = data[1]
-        idata = data[2]
-        if valid_point == 1:
-            var = idata[0][var_name]
-        else:
-            #print(str(cell_id), ' is not a valid point')
-            var = [np.nan]
-    except:
-        #print(idata_file_name)
-        print(idata_file_name, ' is not a valid point')
-        var = [np.nan]
-        cell_id = 85
-        valid_point = 0
-        idata = np.nan
-    
-    return var, cell_id, valid_point, idata
-    
 def extract_posterior(save_dir, idata_file_name, var_name):
     #print(save_dir+idata_file_name)
     
@@ -1038,11 +978,11 @@ def extract_posterior(save_dir, idata_file_name, var_name):
             else:
                 var = idata.posterior[var_name]
         else:
-            #print(str(cell_id), ' is not a valid point')
+            print(str(cell_id), ' is not a valid point')
             var = [np.nan]
     except:
         #print(idata_file_name)
-        print(idata_file_name, ' is not a valid point')
+        print(idata_file_name, ' something is wrong with idata')
         var = [np.nan]
         cell_id = np.nan
         valid_point = 0
