@@ -20,7 +20,7 @@ except ImportError:
     tt = tfp.math
     pmv = 5
     
-#print("PyMC version:", pm.__version__)
+print("PyMC version:", pm.__version__)
 
 import bisect
 
@@ -185,12 +185,7 @@ def compute_filtered_event_indices(rescaled_SM, x_v_events, x_v_event_indices, P
     
 def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, case, event_opt, P_threshold, plot_pi=False):
     # Create mask for valid indices
-    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2 or case == 4:
-        mask &= ~np.isnan(R)
-    elif case == 3:
-        mask &= ~np.isnan(R) & ~np.isnan(ET)
-                 
+    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))    
     v_idx = np.where(mask)[0]
     
     # Find the start and end indices of each precipitation event
@@ -272,15 +267,11 @@ def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, case, event_op
         dsm = np.abs(dsm)
 
     # Calculate statistics for filtered intervals
-    sumP = np.array([np.sum(P[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])    
-    dt = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
-
-    if case == 2 or case == 4:
-        sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
-    if case == 3:
-        sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
-        sumET = np.array([np.sum(ET[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
-                 
+    sumP  = np.array([np.sum(P[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])    
+    sumR  = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
+    sumET = np.array([np.sum(ET[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
+    dt    = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
+    
     # Create DataFrame with calculated statistics
     df = pd.DataFrame({
         't1': JDATES[start_indices],
@@ -290,17 +281,13 @@ def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, case, event_op
         'dSM': dsm,
         'dt': dt,
         'sumP': sumP,
+        'sumR': sumR,
+        'sumET': sumET,
         'start_idx': start_indices,
         'end_idx': end_indices,
         'P_start_idx': P_start_indices,
         'P_end_idx': P_end_indices
     })
-
-    if case == 2 or case == 4:
-        df['sumR']  = sumR
-    if case == 3:
-        df['sumR']  = sumR
-        df['sumET'] = sumET
 
     df.sort_values(by='t1', inplace=True)
 
@@ -312,11 +299,7 @@ def find_wetup(rescaled_SM, P, R, ET, case, P_threshold, threshold_condition=1, 
     #threshold_condition 2: strict - during the wet period, all P should > P_threshold
     
     # Create mask for valid indices
-    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2 or case == 4:
-        mask &= ~np.isnan(R)
-    elif case == 3:
-        mask &= ~np.isnan(R) & ~np.isnan(ET)
+    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))
     v_idx = np.where(mask)[0]
 
     # Extract rescaled SM and JDATES for valid indices
@@ -376,13 +359,7 @@ def find_wetup(rescaled_SM, P, R, ET, case, P_threshold, threshold_condition=1, 
 
 def find_drydown(rescaled_SM, P, R, ET, case, P_threshold=0.01):
     # Create mask for valid indices
-
-    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P))
-    if case == 2 or case == 4:
-        mask &= ~np.isnan(R)
-    elif case == 3:
-        mask &= ~np.isnan(R) & ~np.isnan(ET)
-                 
+    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))
     v_idx = np.where(mask)[0]
 
     # Extract rescaled SM and JDATES for valid indices
@@ -433,23 +410,20 @@ def find_drydown(rescaled_SM, P, R, ET, case, P_threshold=0.01):
     return drydown_start_indices, drydown_end_indices, P_event_start_indices
 
 def make_df_for_event(rescaled_SM, P, R, ET, JDATES, case, P_threshold=0.01, event_opt='wet'):
-    
+
     if event_opt == 'wet':
-        start_indices, end_indices, P_start_indices = find_wetup(rescaled_SM, P, R, case, P_threshold)
+        start_indices, end_indices, P_start_indices = find_wetup(rescaled_SM, P, R, ET, case, P_threshold)
         dsm = np.array([rescaled_SM[end] - rescaled_SM[start] for start, end in zip(start_indices, end_indices)])
     elif event_opt == 'dry':
-        start_indices, end_indices, P_start_indices = find_drydown(rescaled_SM, P, R, case, P_threshold)
+        start_indices, end_indices, P_start_indices = find_drydown(rescaled_SM, P, R, ET, case, P_threshold)
         dsm = np.array([rescaled_SM[start] - rescaled_SM[end] for start, end in zip(start_indices, end_indices)])
 
     # Calculate statistics for filtered intervals
     sumP = np.array([np.sum(P[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])    
+    sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])      
+    sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])
+    sumET = np.array([np.sum(ET[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])
     dt = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
-
-    if case == 2 or case == 4:
-        sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])                 
-    if case == 3:
-        sumR = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])
-        sumET = np.array([np.sum(ET[start:end + 1]) for start, end in zip(P_start_indices, end_indices)])
                  
     # Create DataFrame with calculated statistics
     df = pd.DataFrame({
@@ -460,17 +434,13 @@ def make_df_for_event(rescaled_SM, P, R, ET, JDATES, case, P_threshold=0.01, eve
         'dSM': dsm,
         'dt': dt,
         'sumP': sumP,
+        'sumR': sumR,
+        'sumET': sumET,
         'start_idx': start_indices,
         'end_idx': end_indices,
         'P_start_idx': P_start_indices,
         'P_end_idx': end_indices
     })
-
-    if case == 2:
-        df['sumR'] = sumR
-    if case == 3:
-        df['sumR'] = sumR
-        df['sumET'] = sumET
                  
     df.sort_values(by='t1', inplace=True)
 
@@ -532,7 +502,7 @@ def rescale_SM(SSM_SMAPL3, SSM_NLDAS, P, TR_argument):
     
     return SSM_save, SSM_NLDAS, TR_it, masking_day, sample_rate
 
-def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt='wet'):
+def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, P_threshold, event_opt='wet'):
     
     JDATES = pd.date_range(start='2015-01-01 00:30:00', end='2021-12-31 23:30:00', freq='1h').values.reshape(-1,)
    
@@ -547,57 +517,42 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
         valid_point              = np.argwhere(~np.isnan(SSM_save[i]))
         SSM_save[i][valid_point] = SSM_save[i][valid_point] + GN.reshape(-1,1)
 
-    column_names = ["t1", "t2", "SM1", 
-                    "SM2", "dSM", "dt", 
-                    "sumP", 'start_idx','end_idx',
-                    "P_start_idx", "TR_it_id"]
-    if case == 2 or case == 4:
-        column_names.append('sumR')
-    if case == 3:
-        column_names.append('sumR')
-        column_names.append('sumET')
-                 
+    column_names = ['t1', 't2', 'SM1', 
+                    'SM2', 'dSM', 'dt', 
+                    'sumP',  'sumR', 'sumET',
+                    'start_idx','end_idx',
+                    'P_start_idx', 'TR_it_id']
     df = pd.DataFrame(columns=column_names)
     
     for ii in range(TR_it):
         
         if event_opt == 'wet' or event_opt == 'dry':
-            t_df = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=p_threshold, event_opt=event_opt)
+            t_df = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=P_threshold, event_opt=event_opt)
             t_df['TR_it_id'] = ii
             masking_day = 99999
             
         elif event_opt == 'all':
-            t_df_wet = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=p_threshold, event_opt='wet')
-            t_df_dry = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=p_threshold, event_opt='dry')
+            t_df_wet = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=P_threshold, event_opt='wet')
+            t_df_dry = make_df_for_event(SSM_save[ii], P, R, ET, JDATES, case, P_threshold=P_threshold, event_opt='dry')
             t_df = pd.concat([t_df_wet, t_df_dry], ignore_index=True)
             t_df['TR_it_id'] = ii
             masking_day = 99999
         
         elif event_opt == 'P_wet' or event_opt == 'P_dry' or event_opt == 'P_wet_dry' or event_opt == 'P_dry_period':
-            t_df = make_df_for_P_event(SSM_save[ii], noscale_SSM_NLDAS, P, R, ET, JDATES, case, event_opt, P_threshold=p_threshold, plot_pi=False)
+            t_df = make_df_for_P_event(SSM_save[ii], noscale_SSM_NLDAS, P, R, ET, JDATES, case, event_opt, P_threshold=P_threshold, plot_pi=False)
             t_df['TR_it_id'] = ii
             masking_day = 99999
             
         else:
-            mask = (~np.isnan(SSM_save[ii])) & (SSM_save[ii] > 0) & (SSM_save[ii] < 1) & (~np.isnan(P))
-            if case == 2 or case == 4:
-                mask &= ~np.isnan(R)
-            elif case == 3:
-                mask &= ~np.isnan(R) & ~np.isnan(ET)
-                         
+            mask = (~np.isnan(SSM_save[ii])) & (SSM_save[ii] > 0) & (SSM_save[ii] < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))
             v_idx = np.where(mask)[0]
             v_ssm    = SSM_save[ii][v_idx]
             v_jdates = JDATES[v_idx]
-
             dt       = np.float32((v_jdates[1:] - v_jdates[:-1]).astype('timedelta64[h]'))
             sumP     = np.add.reduceat(P, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
-            if case == 2 or case == 4:
-                sumR = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
-            if case == 3:
-                sumR = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
-                sumET = np.add.reduceat(ET, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
-            
-            dssm     = np.diff(v_ssm) # (mm/mm)/dt; by doing this it is already (mm/mm)/dt unit/ dt is not fixed
+            sumR     = np.add.reduceat(R, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
+            sumET    = np.add.reduceat(ET, v_idx)[:-1] # mm/dt; by doing this it is already mm/dt unit
+            dssm     = np.diff(v_ssm) # (mm/mm)/dt; it is already (mm/mm)/dt unit/ dt is not fixed
             dssm_idx = np.argwhere(dssm > dth).reshape(-1,)
 
             t_df = pd.DataFrame(columns = column_names)
@@ -610,29 +565,33 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
                 t_dSM  = t_SM2 - t_SM1
                 t_dt   = np.float32((t_t2 - t_t1).astype('timedelta64[h]'))
                 t_sumP = sumP[t_dsm_idx]
+                t_sumR = sumR[t_dsm_idx]
+                t_sumET = sumET[t_dsm_idx]
+                
                 start_idx = t_dsm_idx
                 end_idx = t_dsm_idx+1
                 P_start_idx = t_dsm_idx
-                
-                t_list = [t_t1, t_t2, t_SM1, t_SM2, t_dSM, t_dt, t_sumP, start_idx, end_idx, P_start_idx, ii]
-                if case == 2 or case == 4:
-                    t_sumR = sumR[t_dsm_idx]
-                    t_list.append(t_sumR)
-
-                if case == 3:
-                    t_sumR = sumR[t_dsm_idx]
-                    t_sumET = sumP[t_dsm_idx]
-                    t_list.append(t_sumR)
-                    t_list.append(t_sumET)
-                    
+        
+                t_list = [t_t1, t_t2, t_SM1, t_SM2, t_dSM, t_dt,
+                          t_sumP, t_sumR, t_sumET, start_idx, end_idx,
+                          P_start_idx, ii]
+      
                 tt_df = pd.DataFrame([t_list], columns=column_names)
                 t_df  = pd.concat([t_df, tt_df], axis=0)
 
         df = pd.concat([df, t_df], axis=0, ignore_index=True)
 
-    #df = df[df.sumP > p_threshold]
-    df = df.dropna(how='any')
+    #df = df[df.sumP > P_threshold]
 
+    if event_opt != 'P_dry_period':
+            print(event_opt)
+            res = df.sumP - 100*np.abs(df.dSM) - (df.sumR + df.sumET)
+    else:
+            print(event_opt)
+            res = 100*np.abs(df.dSM) + df.sumP - (df.sumR+df.sumET)
+    df['res'] = res
+    
+    df = df.dropna(how='any')
     # mask Jan and Dec
     df['t1'] = pd.to_datetime(df['t1'])
     mask_date = ~(df['t1'].dt.month.isin([1,12]))
@@ -644,7 +603,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std,
     df = df.drop_duplicates()
     
     df = df.reset_index(drop=True)
-    return df, SSM_save, P, R, noscale_SSM_NLDAS, cell_id
+    return df, SSM_save, P, R, noscale_SSM_NLDAS
 
 def make_input(df, case):
     p          = pd.to_numeric(df.sumP).values # mm/dt
@@ -652,23 +611,16 @@ def make_input(df, case):
     SM1        = pd.to_numeric(df.SM1).values
     SM2        = pd.to_numeric(df.SM2).values
     dt         = pd.to_numeric(df.dt).values
-    r          = 0 
-    et         = 0
+    r          = pd.to_numeric(df.sumR).values # mm/dt
+    et         = pd.to_numeric(df.sumET).values # mm/dt
     infilt     = 0
-                         
-    if case == 2:
-        r      = pd.to_numeric(df.sumR).values # mm/dt
-    if case == 3:
-        r      = pd.to_numeric(df.sumR).values # mm/dt
-        et     = pd.to_numeric(df.sumET).values # mm/dt
     asm        = 0
-     
-    if case == 4:
-        r      = pd.to_numeric(df.sumR).values # mm/dt
-    #if (case == 4) | (case == 5):
+    res        = pd.to_numeric(df.res).values # mm/dt
+    
+    #if (case == x) | (case == x):
     #    asm    = pd.to_numeric(df.SM1).values
 
-    return p, dsm, SM1, SM2, dt, r, et, asm, infilt
+    return p, dsm, SM1, SM2, dt, r, et, asm, infilt, res
 
 def f_ET_I(SM1, SM2, a, b, dt):
     ET_I_est = a*(SM1**b + SM2**b)*dt/2
@@ -701,7 +653,7 @@ if pmv == 5:
 # Infilt might be an incorrect term
 # Instead, the percoloation term may be used
 
-def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', event_opt='P_dry_period'):
+def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, res, case, method='advi', event_opt='P_dry_period'):
     idata = 0
     valid = 0
     offset = 0
@@ -719,10 +671,13 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
             b = 0
             
             if case == 1 or case == 2 or case == 4:
+                
                 # ET + D = a*avgSM^b*dt
                 a  = pm.HalfNormal('α', sigma=1000) # weak informative prior (we know it should be positive) 
-                #b  = pm.Normal('β', mu=0, sigma=1000, initval=0)
-                b  = pm.Normal('β', mu=0, sigma=1000, testval=0)
+                if pmv == 3:
+                    b  = pm.Normal('β', mu=0, sigma=1000, testval=0)
+                if pmv == 5:
+                    b  = pm.Normal('β', mu=0, sigma=1000, initval=0)
                 
             # Q ~ d*(P^K1)*(SM^K2)
             d  = 0
@@ -739,7 +694,7 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
             #    K1 = pm.HalfNormal('K1', sigma=1000, initval=1) #, initval=0.5)
             #    K2 = K1
 
-            sd = pm.HalfNormal('sd', sigma=10)
+            sd = pm.HalfNormal('sd', sigma=1)
             if event_opt != 'P_dry_period': #wet-up based calculation
                 if case == 1:
                     #####
@@ -751,10 +706,10 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # Thereroe, we add the offset factor 1e-10 to P.
                     #####
                     offset   = -1e-10
-                    y_obs    = p - offset
+                    y_obs    = np.abs(dsm)
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu       = z*np.abs(dsm) + ET_I_est
-                    Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    mu       = (p - ET_I_est) / z
+                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
                 if case == 2:
                     #####
@@ -765,11 +720,12 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # However, in this case, if P-R = 0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to P - R.
                     #####
-                    offset   = np.min(p-r)-1e-10
-                    y_obs    = p - r - offset
+                    offset   = 0
+                    y_obs    = np.abs(dsm)
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu       = z*np.abs(dsm) + ET_I_est
-                    Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    mu       = (p - (r + ET_I_est))/z 
+                    #mu       = (p - (r + ET_I_est + res))/z #this proves that this approach is correct!
+                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
                 if case == 3:
                     #####
@@ -780,10 +736,41 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # However, in this case, if P-R-ET<=0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to min(ET+R).               
                     #####
-                    offset   = np.min(p-r-et) - 1e-10
-                    y_obs    = p - r - et - offset
-                    mu       = z*np.abs(dsm)
-                    Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    offset    = np.min(p-r-et) - 1e-10
+                    y_obs     = p - r - et - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm))
+
+                    mu        = log_Z + log_dSM
+                    Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    
+                if case == 4:
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    offset    = 0# np.min(p-r-et-res) - 1e-10
+                    y_obs     = p - r - et - res - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm)) 
+                    
+                    mu     = log_Z + log_dSM
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    
+                if case == 5:
+                    #####
+                    # With the case-2, the summation of p is ummation of z*|dSM| and R+ET+I.
+                    # P = z*|dSM| + ET + I + R
+                    # This case, we use the estimated ET+I from f_et_i(SM), obs R.
+                    # P - R = z*|dSM| + f_et_i(s)
+                    # However, in this case, if P-R = 0, we cannot use the lognormal for the likelihood fn.
+                    # Thereroe, we add the offset factor 1e-10 to P - R.
+                    #####
+                    offset   = 0
+                    y_obs    = np.abs(dsm)
+                    ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    mu       = (p - (r + ET_I_est - et + res))/z 
+                    #mu       = (p - (r + ET_I_est + res))/z #this proves that this approach is correct!
+                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    
             else:
 
                 if case == 1:
@@ -796,13 +783,10 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # We do not need to add the offset since we assumed the Normal dist for the likelihood fn.
                     #####
                     offset   = 0
-                    #y_obs    = np.abs(dsm)                                    
+                    y_obs    = np.abs(dsm)                                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    #mu       = (ET_I_est)/z
-                    #Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
-
-                    mu = -z*np.abs(dsm) + ET_I_est
-                    Y_obs = pm.Normal('Y_obs', mu=mu, sigma=1, observed=np.zeros_like(dsm))
+                    mu       = (ET_I_est - p)/z
+                    Y_obs    = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
                 if case == 2:
                     ##### old
@@ -832,17 +816,24 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # beneficial.
                     # This only works with pymc3 version.
                     #####
-                    psi = pm.Beta('psi', 1, 1)
-                    offset = 0# np.min(r)
-                    r[r<=0] = 0
-                    y_obs = r #-offset
+                    offset   = 0
+                    y_obs    = np.abs(dsm)                    
                     ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu = z*np.abs(dsm) - ET_I_est
+                    mu       = (r + ET_I_est - p)/z
+                    #mu = (r + et - p + res)/z #this proves that this approach is correct!
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+
+                    #psi = pm.Beta('psi', 1, 1)
+                    #offset = 0# np.min(r)
+                    #r[r<=0] = 0
+                    #y_obs = r #-offset
+                    #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    #mu = z*np.abs(dsm) - ET_I_est
                 
-                    # Zero-Inflated Exponential likelihood
-                    # This only works with pymc version 3.x
-                    Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
-                                           observed={'value': y_obs, 'psi': psi, 'mu': mu})
+                    ## Zero-Inflated Exponential likelihood
+                    ## This only works with pymc version 3.x
+                    #Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
+                    #                       observed={'value': y_obs, 'psi': psi, 'mu': mu})
                     
                 if case == 3:
                     #####
@@ -854,31 +845,58 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
                     # However, in this case, if R+ET<=0, we cannot use the lognormal for the likelihood fn.
                     # Thereroe, we add the offset factor 1e-10 to min(ET+R).               
                     #####
-                    offset   = np.min(r+et) - 1e-10
-                    y_obs    = r + et - offset
-                    mu       = z*np.abs(dsm)
-                    Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=10)
+                    offset    = np.min(r+et) - 1e-10
+                    y_obs     = r + et - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm))
+                    mu        = log_Z + log_dSM
+                    Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    
+                    #offset   = np.min(r+et) - 1e-10
+                    #y_obs    = r + et - offset
+                    #mu       = z*np.abs(dsm)
+                    #Y_obs    = pm.Lognormal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
                     
                 if case ==4: # case 4 is for testing code
+                    
+                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    offset    = 0 #np.min(r + et + res - p) - 1e-10
+                    y_obs     = r + et + res - p - offset #p - r - et - res - offset
+                    log_y_obs = np.log(y_obs)
+                    log_dSM   = np.log(np.abs(dsm)) 
+                    
+                    mu     = log_Z + log_dSM
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    
                     # Probability of zero inflation
-                    psi = pm.Beta('psi', 1, 1)
-                    offset = np.min(r)# - 1e-10
-                    y_obs = r-offset
-                    ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
-                    mu = z*np.abs(dsm) - ET_I_est
+                    #psi = pm.Beta('psi', 1, 1)
+                    #offset = np.min(r)# - 1e-10
+                    #y_obs = r-offset
+                    #ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    #mu = z*np.abs(dsm) - ET_I_est
                 
                     # Zero-Inflated Exponential likelihood
-                    if pmv == 3:
-                        Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
-                                               observed={'value': y_obs, 'psi': psi, 'mu': mu})
-                    elif pmv == 5:
+                    #if pmv == 3:
+                    #    Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
+                    #                           observed={'value': y_obs, 'psi': psi, 'mu': mu})
+                    #elif pmv == 5:
                         #Y_obs = pm.DensityDist('Y_obs', logp_zero_inflated_exponential, 
                         #                       observed=np.array([y_obs, psi, mu]))
 
                         #Y_obs = pm.CustomDist('Y_obs', logp=logp_zero_inflated_exponential, 
                         #                      observed={'value': y_obs, 'psi': psi, 'mu': mu})
-                        Y_obs = pm.CustomDist('Y_obs', psi, mu, dist=logp_zero_inflated_exponential, observed=y_obs)
-    
+                    #    Y_obs = pm.CustomDist('Y_obs', psi, mu, dist=logp_zero_inflated_exponential, observed=y_obs)
+
+                if case ==5: # case 5 is for testing code
+                    offset   = 0
+                    y_obs    = np.abs(dsm)                    
+                    ET_I_est = f_ET_I(SM1, SM2, a, b, dt)
+                    mu       = (r + ET_I_est - et + res - p)/z
+                    #mu = (r + et - p + res)/z #this proves that this approach is correct!
+                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+                    
         # sampling or fit
         rng = 321
         if method == 'nuts':
@@ -902,20 +920,26 @@ def make_idata(p, dsm, SM1, SM2, dt, r, et, asm, infilt, case, method='advi', ev
 def save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id):
     t_file_name = cell_id+'_c_'+str(case)+'_m_'+method+'_tr_'+str(TR)+'_gn_'+str(GN_std)
     file_exists = exists(save_dir+t_file_name)
+
+    parameter_values = []
     if valid == 0:
         print('sampling not taken: not enough data {}'.format(t_file_name))
         t_file_name = 'bad_'+t_file_name
+
+    elif valid == 1:    
+        parameter_names = ['Z', 'α', 'β']
         
+        for parameter_name in parameter_names:
+            if pmv == 3:
+                values = idata.get_values(parameter_name)
+            if pmv == 5:
+                values = idata.posterior.Z[0].values
+                
+            parameter_values.append({parameter_name: values})
+
     file = open(save_dir+t_file_name, 'wb')
     pickle.dump(valid, file)
     pickle.dump(cell_id, file)
-
-    parameter_names = ['Z', 'α', 'β']
-    parameter_values = []
-    for parameter_name in parameter_names:
-        values = idata.get_values(parameter_name)
-        parameter_values.append({parameter_name: values})
-
     pickle.dump(parameter_values, file)
     pickle.dump(lam, file)
     file.close()
@@ -936,21 +960,22 @@ def fitting(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, method, TR, GN_std, 
         
         if check_file:
             #print('idata data already exists')
-            return 0, 0, 0
+            return 0, 0, 0, 0
         else:
-    
-            TR_argument = [TR, sub_opt, div_opt, sample_rate_opt] #TR, consider subsample (same TR), diversity, sample_rate
-            df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
-            p, dsm, SM1, SM2, dt, r, asm, et, infilt = make_input(df, case)
-            idata, valid, lam = make_idata(p, dsm, SM1, SM2, dt, r, asm, et, infilt, case, method, event_opt) 
+            TR_argument = [TR, sub_opt, div_opt, sample_rate_opt]
+            
+            df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
+            
+            p, dsm, SM1, SM2, dt, r, asm, et, infilt, res = make_input(df, case)
+            idata, valid, lam = make_idata(p, dsm, SM1, SM2, dt, r, asm, et, infilt, res, case, method, event_opt) 
             save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id)
             return idata, valid, lam, df
         
     else:
         TR_argument = [TR, sub_opt, div_opt, sample_rate_opt] #TR, consider subsample (same TR), diversity, sample_rate
-        df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
-        p, dsm, SM1, SM2, dt, r, asm, et, infilt = make_input(df, case)
-        idata, valid, lam = make_idata(p, dsm, SM1, SM2, dt, r, asm, et, infilt, case, method, event_opt)
+        df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
+        p, dsm, SM1, SM2, dt, r, asm, et, infilt, res = make_input(df, case)
+        idata, valid, lam = make_idata(p, dsm, SM1, SM2, dt, r, asm, et, infilt, res, case, method, event_opt)
         return idata, valid, lam, df
 
 ### idata-related codes
@@ -1071,6 +1096,8 @@ def extract_idata(idata_save_dir, lat, opt='median'):
                     elif opt == 'hdi_high':
                         Z_samples = az.hdi(idata[i].posterior['Z'], hdi_prob=0.94)
                         Z_temp[i] = Z_samples['Z'].sel(hdi='higher').values
+                    elif opt == 'std':
+                        Z_temp[i] = np.std(z)
                 else:
                     if opt == 'median':
                         Z_temp[i] = np.median(z)
@@ -1078,6 +1105,8 @@ def extract_idata(idata_save_dir, lat, opt='median'):
                         Z_temp[i] = calculate_hdi(z, hdi_prob=0.94, hdi_type='lower')
                     elif opt == 'hdi_high':
                         Z_temp[i] = calculate_hdi(z, hdi_prob=0.94, hdi_type='higher')
+                    elif opt == 'std':
+                        Z_temp[i] = np.std(z)
             else:
                 Z_temp[i] = np.nan 
 
