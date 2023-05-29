@@ -82,6 +82,7 @@ def find_cellid_col(input_FP, file_name, cell_id):
 find_cellid_col.cache = {}
     
 def extract_data_from_col(data, columns, col, scale_factor, nan_fill=False):
+    
     if col <= len(columns) - 1:
         cell_id = columns[col]
         
@@ -170,7 +171,7 @@ def compute_filtered_event_indices(rescaled_SM, x_v_events, x_v_event_indices, P
             f_x_events = [event for i, event in enumerate(x_v_events) if diff_sm[i] < 0]
             f_P_start_indices = [event for i, event in enumerate(P_v_start_indices) if diff_sm[i] < 0]
             f_P_end_indices   = [event for i, event in enumerate(P_v_end_indices) if diff_sm[i] < 0]
-                
+
         start_indices = [event[0] for event in f_x_events]
         end_indices = [event[-1] for event in f_x_events]
         
@@ -187,8 +188,8 @@ def compute_filtered_event_indices(rescaled_SM, x_v_events, x_v_event_indices, P
 
 def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_event_start_indices, P_event_end_indices, event_opt):
 
-    start_indices_or_SM = np.copy(start_indices)
-    end_indices_or_SM = np.copy(end_indices)
+    start_indices_or_SM = np.copy(start_indices).tolist()
+    end_indices_or_SM = np.copy(end_indices).tolist()
     for i, (si, ei) in enumerate(zip(P_event_start_indices, P_event_end_indices)):
         
         event_idx = list(range(si, ei))
@@ -205,7 +206,7 @@ def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_e
 
         else:
             True
-
+    
     return start_indices_or_SM, end_indices_or_SM
     
 def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, event_opt, P_threshold, plot_pi=False):
@@ -297,7 +298,7 @@ def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, event_opt, P_threshol
 def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, event_opt, P_threshold, plot_pi=False):
 
     start_indices, end_indices, P_start_indices, P_end_indices, start_indices_or_SM, end_indices_or_SM = find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, event_opt, P_threshold, plot_pi)
-    
+
     dsm    = np.array([rescaled_SM[end] - rescaled_SM[start] for start, end in zip(start_indices, end_indices)])
     dsm_or = np.array([SSM_NLDAS[end]   - SSM_NLDAS[start]  for start, end in zip(start_indices_or_SM, end_indices_or_SM)])
     
@@ -310,7 +311,7 @@ def make_df_for_P_event(rescaled_SM, SSM_NLDAS, P, R, ET, JDATES, event_opt, P_t
     sumR  = np.array([np.sum(R[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
     sumET = np.array([np.sum(ET[start:end + 1]) for start, end in zip(P_start_indices, P_end_indices)])
     dt    = (JDATES[end_indices] - JDATES[start_indices]).astype("timedelta64[h]").astype(np.float64)
-    
+
     # Create DataFrame with calculated statistics
     df = pd.DataFrame({
         't1': JDATES[start_indices],
@@ -1035,6 +1036,7 @@ def fitting(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, method, TR, GN_std, 
             #print('idata data already exists')
             return 0, 0, 0, 0
         else:
+            print(cell_id)
             TR_argument = [TR, sub_opt, div_opt, sample_rate_opt]
             
             df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
