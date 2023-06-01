@@ -140,7 +140,9 @@ def compute_valid_event_indices(rescaled_SM, x_event_indices, event_opt):
     for i in range(len(x_event_indices)):
         event_idx = x_event_indices[i]
         if len(event_idx) >= 2:
-            
+
+            #print('SMAP')
+            #print(rescaled_SM[event_idx])
             min_idx = event_idx[np.argmin(rescaled_SM[event_idx])]
             max_idx = event_idx[np.argmax(rescaled_SM[event_idx])]
             
@@ -193,6 +195,8 @@ def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_e
     for i, (si, ei) in enumerate(zip(P_event_start_indices, P_event_end_indices)):
         
         event_idx = list(range(si, ei))
+        #print('NLDAS')
+        #print(SSM_NLDAS[event_idx])
         min_idx = event_idx[np.nanargmin(SSM_NLDAS[event_idx])]
         max_idx = event_idx[np.nanargmax(SSM_NLDAS[event_idx])]
 
@@ -211,7 +215,7 @@ def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_e
     
 def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, event_opt, P_threshold, plot_pi=False):
     # Create mask for valid indices
-    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))    
+    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(SSM_NLDAS)) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))
     v_idx = np.where(mask)[0]
     
     # Find the start and end indices of each precipitation event
@@ -565,7 +569,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
         GN                          = np.random.normal(0, GN_std, sum(~np.isnan(SSM_save[i])))
         valid_point                 = np.argwhere(~np.isnan(SSM_save[i]))
         SSM_save[i][valid_point]    = SSM_save[i][valid_point] + GN.reshape(-1,1)
-        
+
     column_names = ['t1', 't2', 'SM1', 
                     'SM2', 'dSM', 'dt',
                     'SM1_or', 'SM2_or', 'dSM_or',
