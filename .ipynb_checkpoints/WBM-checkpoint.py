@@ -140,7 +140,9 @@ def compute_valid_event_indices(rescaled_SM, x_event_indices, event_opt):
     for i in range(len(x_event_indices)):
         event_idx = x_event_indices[i]
         if len(event_idx) >= 2:
-            
+
+            #print('SMAP')
+            #print(rescaled_SM[event_idx])
             min_idx = event_idx[np.argmin(rescaled_SM[event_idx])]
             max_idx = event_idx[np.argmax(rescaled_SM[event_idx])]
             
@@ -193,6 +195,8 @@ def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_e
     for i, (si, ei) in enumerate(zip(P_event_start_indices, P_event_end_indices)):
         
         event_idx = list(range(si, ei))
+        #print('NLDAS')
+        #print(SSM_NLDAS[event_idx])
         min_idx = event_idx[np.nanargmin(SSM_NLDAS[event_idx])]
         max_idx = event_idx[np.nanargmax(SSM_NLDAS[event_idx])]
 
@@ -211,7 +215,7 @@ def compute_valid_event_indices_or_SM(SSM_NLDAS, start_indices, end_indices, P_e
     
 def find_P_wetup_drydown(rescaled_SM, SSM_NLDAS, P, R, ET, event_opt, P_threshold, plot_pi=False):
     # Create mask for valid indices
-    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))    
+    mask = (~np.isnan(rescaled_SM)) & (rescaled_SM > 0) & (rescaled_SM < 1) & (~np.isnan(SSM_NLDAS)) & (~np.isnan(P)) & (~np.isnan(R)) & (~np.isnan(ET))
     v_idx = np.where(mask)[0]
     
     # Find the start and end indices of each precipitation event
@@ -565,7 +569,7 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
         GN                          = np.random.normal(0, GN_std, sum(~np.isnan(SSM_save[i])))
         valid_point                 = np.argwhere(~np.isnan(SSM_save[i]))
         SSM_save[i][valid_point]    = SSM_save[i][valid_point] + GN.reshape(-1,1)
-        
+
     column_names = ['t1', 't2', 'SM1', 
                     'SM2', 'dSM', 'dt',
                     'SM1_or', 'SM2_or', 'dSM_or',
@@ -943,15 +947,20 @@ def make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res, case, meth
                     #This is semi_true and can show why even though we do not miss constraints
                     #how the low qaulity and high TR could effect z.
                     #####
-                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
-                    offset    = 0#np.min(r + et + res - p) - 1e-10
-                    y_obs     = r + et + res - p - offset #p - r - et - res - offset
-                    log_y_obs = np.log(y_obs)
-                    log_dSM   = np.log(np.abs(dsm)) 
+                    #log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    #offset    = 0#np.min(r + et + res - p) - 1e-10
+                    #y_obs     = r + et + res - p - offset #p - r - et - res - offset
+                    #log_y_obs = np.log(y_obs)
+                    #log_dSM   = np.log(np.abs(dsm)) 
                     
-                    mu     = log_Z + log_dSM
-                    Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
-                
+                    #mu     = log_Z + log_dSM
+                    #Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+
+                    y_obs = np.abs(dsm)
+                    offset = 0
+                    mu = (r + et + res - p)/z
+                    Y_obs = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
+
                 if case == 'true':
                     #####
                     #This is the true case. np.exp(log_Z) must be 100.
@@ -1036,7 +1045,7 @@ def fitting(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, method, TR, GN_std, 
             #print('idata data already exists')
             return 0, 0, 0, 0
         else:
-            print(cell_id)
+            #print(cell_id)
             TR_argument = [TR, sub_opt, div_opt, sample_rate_opt]
             
             df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
@@ -1110,7 +1119,7 @@ def calculate_hdi(idata, hdi_prob=0.94, hdi_type='lower'):
     hdi_values = sorted_data[hdi_indices]
     return hdi_values
     
-def extract_idata(idata_save_dir, lat, opt='median'):
+def extract_idata(idata_save_dir, lat, opt='median', var_name='Z'):
     
     logging.getLogger("arviz").setLevel(logging.ERROR)
     idata_list = make_idata_list(idata_save_dir)
@@ -1120,7 +1129,7 @@ def extract_idata(idata_save_dir, lat, opt='median'):
     idata=[0]*len(idata_list)
     
     for i in range(len(idata_list)):
-        Z[i],cell_id[i],Z_valid[i], idata[i] = extract_posterior(idata_save_dir, idata_list[i], 'Z')
+        Z[i],cell_id[i],Z_valid[i], idata[i] = extract_posterior(idata_save_dir, idata_list[i], var_name)
  
     if Z_valid[i] == 1:
         cell_id = np.array(cell_id, dtype=np.int32)
