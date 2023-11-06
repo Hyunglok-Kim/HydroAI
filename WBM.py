@@ -566,9 +566,22 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
 
     # add Gaussian noise
     for i in range(TR_it):
-        GN                          = np.random.normal(0, GN_std, sum(~np.isnan(SSM_save[i])))
-        valid_point                 = np.argwhere(~np.isnan(SSM_save[i]))
-        SSM_save[i][valid_point]    = SSM_save[i][valid_point] + GN.reshape(-1,1)
+        valid_point = np.argwhere(~np.isnan(SSM_save[i]))
+        
+        if isinstance(GN_std, (int, float)):
+            GN = np.random.normal(0, GN_std, len(valid_point))
+            
+        elif isinstance(GN_std, str):
+            diff       = SSM_SMAPL3 - SSM_save[i]
+            vnod       = sum(~np.isnan(diff))
+            
+            if vnod > 30:
+                true_std_e = np.nanstd(diff)
+                GN         = np.random.normal(0, true_std_e, len(valid_point))
+            else:
+                GN = np.full((len(valid_point),1), np.nan)
+
+        SSM_save[i][valid_point] = SSM_save[i][valid_point] + GN.reshape(-1,1)
 
     column_names = ['t1', 't2', 'SM1', 
                     'SM2', 'dSM', 'dt',
@@ -825,13 +838,18 @@ def make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res, case, meth
                     #This is semi_true and can show why even though we do not miss constraints
                     #how the low qaulity and high TR could effect z.
                     #####
-                    log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
-                    offset    = 0 #np.min(p - r - et - res) - 1e-10
-                    y_obs     = p - r - et - res - offset
-                    log_y_obs = np.log(y_obs)
-                    log_dSM   = np.log(np.abs(dsm)) 
-                    mu        = log_Z + log_dSM
-                    Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    #log_Z     = pm.Normal('log_Z', mu=0, sigma=1)
+                    #offset    = 0 #np.min(p - r - et - res) - 1e-10
+                    #y_obs     = p - r - et - res - offset
+                    #log_y_obs = np.log(y_obs)
+                    #log_dSM   = np.log(np.abs(dsm)) 
+                    #mu        = log_Z + log_dSM
+                    #Y_obs     = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
+                    
+                    z = pm.TruncatedNormal('Z', mu=100, sigma=100, lower=0, upper=500)
+                    y_obs = np.abs(dsm)
+                    mu = (p - r - et - res - offset)/z
+                    Y_obs = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=y_obs)
 
                 if case == 'true':
                     #####
@@ -955,7 +973,8 @@ def make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res, case, meth
                     
                     #mu     = log_Z + log_dSM
                     #Y_obs  = pm.Normal('Y_obs', mu=mu, sigma=sd, observed=log_y_obs)
-
+                    
+                    z = pm.TruncatedNormal('Z', mu=100, sigma=100, lower=0, upper=500)
                     y_obs = np.abs(dsm)
                     offset = 0
                     mu = (r + et + res - p)/z
