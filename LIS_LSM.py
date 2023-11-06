@@ -30,17 +30,31 @@ def get_nc_file_paths(base_dir, contain='_HIST_'):
 #nc_paths = get_nc_file_paths(LIS_LSM_FP)
 #print(f"Found {len(nc_paths)} .nc files.")
 
-def get_nc_variable_list(nc_file_path):
+def get_nc_variable_names_units(nc_file_path):
     """
-    Get a list of variable names from a NetCDF file.
+    Get a list of variable names and a corresponding list of their units from a NetCDF file.
 
     :param nc_file_path: Path to the NetCDF file.
-    :return: A list of variable names.
+    :return: A list of variable names and a list of units for these variables.
     """
+    variable_names = []
+    variable_units_list = []
+    
     with Dataset(nc_file_path, 'r') as nc:
         # Extract the list of variable names
         variable_names = list(nc.variables.keys())
-    return variable_names
+        
+        # Create a list that contains only the units for each variable
+        for var_name in variable_names:
+            try:
+                # Try to get the 'units' attribute for the variable
+                variable_units_list.append(nc.variables[var_name].units)
+            except AttributeError:
+                # If the variable doesn't have a 'units' attribute, append None
+                variable_units_list.append(None)
+                
+    return variable_names, variable_units_list
+
 
 # Example usage:
 #nc_file = nc_paths[0]

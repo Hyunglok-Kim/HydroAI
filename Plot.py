@@ -3,6 +3,7 @@ import cartopy.crs as ccrs
 import cartopy.feature
 import numpy as np
 import os
+import re
 import rasterio
 
 from PIL import Image
@@ -63,7 +64,7 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
 
-    plt.close(fig)  # Close the figure to free memory after saving
+    #plt.close(fig)  # Close the figure to free memory after saving
     return fig, ax
 
 
@@ -86,9 +87,18 @@ def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output
         if threshold_value is not None:
             data[data < threshold_value] = np.nan  # Set values below the threshold to nan
         
-        # Plot the data with fixed color scale
+        # Extract date from the filename using regex
+        date_match = re.search(r'\d{8}', nc_paths[i])
+        date_str = date_match.group(0) if date_match else 'Unknown Date'
+        
+        # Convert the date string to a more readable format if necessary
+        # For example, '20150101' becomes '2015-01-01'
+        formatted_date = f'{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}'
+        
+        # Plot the data with fixed color scale and add the date as title
         fig, ax = plot_regional_map(domain_lon, domain_lat, data, variable_name, global_min, global_max, padding, cmap)
-
+        ax.set_title(formatted_date)  # Set the extracted date as the title
+        
         temp_img_path = f"temp_{i}.png"
         fig.savefig(temp_img_path)
         plt.close(fig)
