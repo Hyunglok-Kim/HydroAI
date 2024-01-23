@@ -5,10 +5,12 @@ import numpy as np
 import os
 import re
 import rasterio
+from tqdm import tqdm 
 
 from PIL import Image
 
 from hydroAI.LIS_LSM import get_variable_from_nc
+from hydroAI.Data import Resampling
 
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
     # Create a new figure and axes with a Plate Carrée projection
@@ -68,7 +70,7 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
     return fig, ax
 
 
-def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output_gif_path, start_index, end_index, padding, cmap='jet', duration=500, threshold_value=None):
+def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output_gif_path, start_index, end_index, padding, cmap='jet', duration=500, threshold_value=None, resampling=False, target_lon=False, target_lat=False):
     images = []
     global_min = np.inf
     global_max = -np.inf
@@ -82,7 +84,7 @@ def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output
         global_max = max(np.nanmax(data), global_max)
     
     # Create each frame for the GIF
-    for i in range(start_index, end_index):
+    for i in tqdm(range(start_index, end_index), desc="Processing"):
         data = get_variable_from_nc(nc_paths[i], variable_name)
         if threshold_value is not None:
             data[data < threshold_value] = np.nan  # Set values below the threshold to nan
@@ -96,7 +98,12 @@ def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output
         formatted_date = f'{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}'
         
         # Plot the data with fixed color scale and add the date as title
-        fig, ax = plot_regional_map(domain_lon, domain_lat, data, variable_name, global_min, global_max, padding, cmap)
+        if resampling:
+            data = Resampling(target_lat, target_lon, domain_lat, domain_lon, data, 'nearest', 'mean', 1)
+            fig, ax = plot_regional_map(target_lon, target_lat, data, variable_name, global_min, global_max, padding, cmap)
+        else:
+            fig, ax = plot_regional_map(domain_lon, domain_lat, data, variable_name, global_min, global_max, padding, cmap)
+
         ax.set_title(formatted_date)  # Set the extracted date as the title
         
         temp_img_path = f"temp_{i}.png"

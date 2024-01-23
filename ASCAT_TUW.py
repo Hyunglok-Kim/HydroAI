@@ -1,5 +1,7 @@
-import h5py
 import scipy.io
+import os
+import h5py
+import netCDF4
 
 def load_mat_file(mat_file, path):
     # Open MATLAB file
