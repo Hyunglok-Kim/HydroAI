@@ -144,7 +144,7 @@ def process_var(i, lat_target, lon_target, lat_input, lon_input, data, sampling_
     result = Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method, mag_factor)
     return result
 
-def Resampling_forloop(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method, mag_factor):
+def Resampling_forloop(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=3):
     
     m, n = lat_target.shape  # Get the dimensions from lat_target
     # Initialize results array
