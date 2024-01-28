@@ -52,6 +52,10 @@ def copernicus(FP, input_file, dst_crs, resolution, output_FP=None):
     output_file = f"{output_FP}/{base_name}_{crs_name}_res{resolution}.tif" if output_FP else f"{base_name}_{crs_name}_res{resolution}_temp.tif"
     
     with rasterio.open(input_file_path) as src:
+        # Print or store the CRS of the input file
+        input_crs = src.crs
+        print(f"CRS of the input file: {input_crs}")
+        
         transform, width, height = calculate_default_transform(src.crs, dst_crs, src.width, src.height, *src.bounds)
         kwargs = src.meta.copy()
         kwargs.update({'crs': dst_crs, 'transform': transform, 'width': width, 'height': height, 'dtype': 'int32'})
