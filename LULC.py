@@ -75,7 +75,7 @@ def copernicus(FP, input_file, dst_crs, resolution, output_FP=None):
     x_flat = x.flatten()
     y_flat = y.flatten()
     
-    lon_flat, lat_flat = rasterio.warp.transform(src_crs=rds.rio.crs, dst_crs='EPSG:4326', xs=x_flat, ys=y_flat)
+    lon_flat, lat_flat = rasterio.warp.transform(src_crs=rds.rio.crs, dst_crs=dst_crs, xs=x_flat, ys=y_flat)
     lon_flat = np.array(lon_flat)
     lat_flat = np.array(lat_flat)
     
