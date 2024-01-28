@@ -198,3 +198,46 @@ def find_closest_index(longitudes, latitudes, point):
     tree = cKDTree(lon_lat)
     dist, idx = tree.query(point, k=1)
     return np.unravel_index(idx, latitudes.shape)
+
+def extract_region_from_data(longitude, latitude, X, bounds):
+    """
+    Create a subset of a 3D array based on given latitude and longitude bounds.
+    
+    Args:
+    - X: The 3D array to subset. The first two dimensions should correspond to latitude and longitude.
+    - latitude: 2D array of latitude values corresponding to the first dimension of X.
+    - longitude: 2D array of longitude values corresponding to the second dimension of X.
+    - bounds: Tuple of (lon_min, lon_max, lat_min, lat_max).
+    
+    Returns:
+    - A subset of X corresponding to the specified bounds.
+    """
+    lon_min, lon_max, lat_min, lat_max = bounds
+    
+    # Find indices for the bounding box
+    lat_indices = np.where((latitude >= lat_min) & (latitude <= lat_max))
+    lon_indices = np.where((longitude >= lon_min) & (longitude <= lon_max))
+
+    # Find the minimum and maximum indices to slice the array
+    lat_min_idx, lat_max_idx = min(lat_indices[0]), max(lat_indices[0])
+    lon_min_idx, lon_max_idx = min(lon_indices[1]), max(lon_indices[1])
+
+    # Subset the array
+    subset = X[lat_min_idx:lat_max_idx+1, lon_min_idx:lon_max_idx+1, :]
+    
+    return subset
+
+def average_over_space(X):
+    """
+    Compute the average over the first two dimensions in a 3D array.
+    
+    Args:
+    - X: The 3D array to compute the average on. The first two dimensions are averaged.
+    
+    Returns:
+    - A 1D array of shape (Z,) representing the average over the first two dimensions for each layer in the third dimension.
+    """
+    # Compute the mean over the first two dimensions (latitude and longitude)
+    mean_values = np.nanmean(X, axis=(0, 1))
+    
+    return mean_values
