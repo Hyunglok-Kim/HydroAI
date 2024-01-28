@@ -1,13 +1,15 @@
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import cartopy.crs as ccrs
-import cartopy.feature
+import cartopy.feature as cfeature
 import numpy as np
 import os
 import re
 import rasterio
-from tqdm import tqdm 
-
+from tqdm import tqdm
 from PIL import Image
+from scipy import ndimage
+import rioxarray
 
 from hydroAI.LIS_LSM import get_variable_from_nc
 from hydroAI.Data import Resampling
@@ -69,6 +71,116 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
     #plt.close(fig)  # Close the figure to free memory after saving
     return fig, ax
 
+def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
+    # Define color map
+    color_map = {
+        0: (40, 40, 40),
+        111: (88, 72, 31),
+        112: (0, 153, 0),
+        113: (112, 102, 62),
+        114: (0, 204, 0),
+        115: (78, 117, 31),
+        116: (0, 120, 0),
+        121: (102, 96, 0),
+        122: (141, 180, 0),
+        123: (141, 116, 0),
+        124: (160, 220, 0),
+        125: (146, 153, 0),
+        126: (100, 140, 0),
+        20: (255, 187, 34),
+        30: (255, 255, 76),
+        40: (240, 150, 255),  
+        50: (250, 0, 0),
+        60: (180, 180, 180),
+        70: (240, 240, 240),
+        80: (0, 50, 200),
+        90: (0, 150, 160),
+        100: (250, 230, 160),
+        200: (200, 230, 255)
+        # Add more LULC codes and their corresponding colors as needed
+    }
+    
+    # Create an empty RGB array
+    rgb_image = np.zeros((rds.shape[1], rds.shape[2], 3), dtype=np.uint8)
+    
+    # Map LULC values to RGB colors
+    for code, color in color_map.items():
+        mask = rds.values[0] == code
+        rgb_image[mask] = color
+    
+    # Define land cover class names
+    land_cover_classes = {
+        0: 'No input data available',
+        111: 'Closed forest, evergreen needle leaf',
+        112: 'Closed forest, evergreen, broad leaf',
+        113: 'Closed forest, deciduous needle leaf',
+        114: 'Closed forest, deciduous broad leaf',
+        115: 'Closed forest, mixed',
+        116: 'Closed forest, unknown',
+        121: 'Open forest, evergreen needle leaf',
+        122: 'Open forest, evergreen broad leaf',
+        123: 'Open forest, deciduous needle leaf',
+        124: 'Open forest, deciduous broad leaf',
+        125: 'Open forest, mixed',
+        126: 'Open forest, unknown',
+        20: 'Shrubs',
+        30: 'Herbaceous vegetation',
+        40: 'Cultivated and managed vegetation/agriculture',
+        50: 'Urban / built up',
+        60: 'Bare / sparse vegetation',
+        70: 'Snow and Ice',
+        80: 'Permanent water bodies',
+        90: 'Herbaceous wetland',
+        100: 'Moss and lichen',
+        200: 'Open sea',
+        # Add more LULC codes and their names as needed
+    }
+    # Find unique values in the data
+    unique_values_in_data = np.unique(rds.values[0])
+    # Plotting
+    # Set the extent of the map
+    if region == 'South Korea':
+        lon_min, lon_max, lat_min, lat_max = 125.7, 129.7, 33.9, 38.8
+        lon_min, lon_max, lat_min, lat_max = 126.73, 126.95, 35.17, 35.37
+    else:
+        lon_min, lon_max, lat_min, lat_max = np.min(longitude), np.max(longitude), np.min(latitude), np.max(latitude)
+
+    # Plotting
+    fig = plt.figure(figsize=(10, 8), dpi=150)
+    
+    # Define the map projection
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    
+    # Set the extent to the Korean Peninsula
+    ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    
+    # Add country borders and coastlines
+    ax.add_feature(cfeature.BORDERS, edgecolor='black')
+    ax.coastlines()
+    
+    # Add gridlines
+    ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
+    
+    # Create the mesh plot using cropped_lons_2d and cropped_lats_2d
+    mesh = plt.pcolormesh(longitude, latitude, rgb_image, shading='auto', transform=ccrs.PlateCarree())
+    
+    # Find unique values in the data
+    unique_values_in_data = np.unique(rds.values[0])
+    
+    # Create legend patches only for the unique values present in the data
+    legend_patches = [mpatches.Patch(color=np.array(color_map[code]) / 255, label=land_cover_classes[code]) for code in unique_values_in_data if code in color_map and code in land_cover_classes]
+    
+    # Plotting the RGB image with coordinates
+    ax.set_title(title)
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    
+    # Add the legend to the plot
+    # Position the legend below the figure and organize into two lines
+    legend = ax.legend(handles=legend_patches, bbox_to_anchor=(0.5, -0.1), loc='upper center', borderaxespad=0, ncol=2, title='Land Cover Classes')
+    
+    plt.tight_layout()
+    plt.show()
 
 def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output_gif_path, start_index, end_index, padding, cmap='jet', duration=500, threshold_value=None, resampling=False, target_lon=False, target_lat=False):
     images = []
