@@ -29,7 +29,7 @@ def majority_filter(data, size=3, nodata=-9999):
             return np.argmax(counts)
     return ndimage.generic_filter(data, filter_func, size=size)
 
-def copernicus(FP, input_file, dst_crs, resolution, create_output_file=True):
+def copernicus(FP, input_file, dst_crs, resolution, output_FP=None):
     """
     Reproject and resample the input raster data, then apply the majority filter to the data.
     Args:
@@ -37,7 +37,7 @@ def copernicus(FP, input_file, dst_crs, resolution, create_output_file=True):
     - input_file: Name of the input raster file.
     - dst_crs: The target coordinate reference system.
     - resolution: The target resolution for resampling.
-    - create_output_file: If True, create an output file, else delete it.
+    - output_FP: File path where the output file will be saved. If None, the output file is created temporarily and removed.
     
     Returns:
     - rds: Reprojected and resampled data.
@@ -47,7 +47,9 @@ def copernicus(FP, input_file, dst_crs, resolution, create_output_file=True):
     input_file_path = f"{FP}/{input_file}"
     base_name = input_file.split('.')[0]
     crs_name = dst_crs.split(':')[1]
-    output_file = f"{FP}/{base_name}_{crs_name}_res{resolution}.tif"
+
+    # Construct the output file path
+    output_file = f"{output_FP}/{base_name}_{crs_name}_res{resolution}.tif" if output_FP else f"{base_name}_{crs_name}_res{resolution}_temp.tif"
     
     with rasterio.open(input_file_path) as src:
         transform, width, height = calculate_default_transform(src.crs, dst_crs, src.width, src.height, *src.bounds)
@@ -64,7 +66,8 @@ def copernicus(FP, input_file, dst_crs, resolution, create_output_file=True):
     for i in range(rds.rio.count):
         rds.values[i] = majority_filter(rds.values[i], size=3, nodata=-9999)
     
-    if not create_output_file:
+    if not output_FP:
+        # If an output file path was not specifically provided, remove the temporary file
         os.remove(output_file)
     
     x, y = np.meshgrid(np.arange(rds.rio.width), np.arange(rds.rio.height))
@@ -80,3 +83,4 @@ def copernicus(FP, input_file, dst_crs, resolution, create_output_file=True):
     lat = lat_flat.reshape(y.shape)
 
     return rds, lon, lat
+
