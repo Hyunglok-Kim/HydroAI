@@ -245,24 +245,35 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     plt.tight_layout()
     plt.show()
 
+
 def plot_time_series(coords, longitude, latitude, data, label, x_label='Time', y_label='Soil Moisture'):
     """
-    Finds the closest pixel for given coordinates and plots the time series.
+    Adds a time series to an existing plot. If data is a 3D array, it finds the closest pixel for given coordinates and plots the time series for that pixel.
+    If data is a 1D array, it plots the time series directly.
     
     Args:
     - coords: Tuple of (longitude, latitude).
     - longitude: 2D array of longitude values.
     - latitude: 2D array of latitude values.
-    - data: 3D array of data (e.g., SMAP data).
+    - data: 3D array or 1D array of data (e.g., SMAP data).
     - label: Label for the plot.
     - x_label: Label for the x-axis.
     - y_label: Label for the y-axis.
     """
-    closest_pixel_index = Data.find_closest_index(longitude, latitude, coords)
-    time_series = data[closest_pixel_index[0], closest_pixel_index[1], :]
+    if data.ndim == 1:
+        # Data is a 1D array; plot it directly
+        time_series = data
+    elif data.ndim == 3:
+        # Data is a 3D array; find the closest pixel and extract its time series
+        closest_pixel_index = Data.find_closest_index(longitude, latitude, coords)
+        time_series = data[closest_pixel_index[0], closest_pixel_index[1], :]
+    else:
+        raise ValueError("Data must be either a 1D or 3D array.")
+
     plt.plot(time_series, '.-', label=label)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
+    plt.legend()
 
 def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output_gif_path, start_index, end_index, padding, cmap='jet', duration=500, threshold_value=None, resampling=False, target_lon=False, target_lat=False):
     images = []
