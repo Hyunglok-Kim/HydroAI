@@ -72,6 +72,22 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
     return fig, ax
 
 def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
+    """
+    Plot the LULC map from Copernicus data.
+    
+    Args:
+    - longitude: Array of longitude values.
+    - latitude: Array of latitude values.
+    - rds: Raster dataset containing LULC data.
+    - title: Title of the plot.
+    - region (optional): If provided, should be a list or tuple in the format [lon_min, lon_max, lat_min, lat_max] 
+                         specifying the bounding coordinates for the plot. If not provided, the function will use 
+                         the full range of longitude and latitude values from the provided arrays.
+
+    This function plots the land use and land cover (LULC) data, mapping the LULC codes to their respective colors 
+    and displaying the result on a map. The map can be focused on a specific region if the 'region' parameter is provided.
+    """
+    
     # Define color map
     color_map = {
         0: (40, 40, 40),
@@ -139,9 +155,8 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     unique_values_in_data = np.unique(rds.values[0])
     # Plotting
     # Set the extent of the map
-    if region == 'South Korea':
-        lon_min, lon_max, lat_min, lat_max = 125.7, 129.7, 33.9, 38.8
-        lon_min, lon_max, lat_min, lat_max = 126.73, 126.95, 35.17, 35.37
+    if region and isinstance(region, (list, tuple)) and len(region) == 4:
+        lon_min, lon_max, lat_min, lat_max = region
     else:
         lon_min, lon_max, lat_min, lat_max = np.min(longitude), np.max(longitude), np.min(latitude), np.max(latitude)
 
