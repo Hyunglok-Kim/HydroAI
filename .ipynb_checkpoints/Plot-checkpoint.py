@@ -1,19 +1,67 @@
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-import numpy as np
 import os
 import re
+
+from scipy import ndimage
+import numpy as np
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import cartopy
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import rasterio
 from tqdm import tqdm
 from PIL import Image
-from scipy import ndimage
 import rioxarray
 
 from hydroAI.LIS_LSM import get_variable_from_nc
 from hydroAI.Data import Resampling
+import hydroAI.Data as Data
 
+def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
+    """
+    Plots a map with the given data, either globally or within specified longitude and latitude bounds.
+
+    Args:
+    - longitude: 2D array of longitude values.
+    - latitude: 2D array of latitude values.
+    - values: 2D array of data values to plot.
+    - title: Title for the colorbar and plot.
+    - cmin, cmax: Minimum and maximum values for the colorbar.
+    - cmap: Colormap to use for plotting data.
+    - bounds: List or tuple of the format [lon_min, lon_max, lat_min, lat_max] for the map extent. If None, uses full range.
+    - dem_path: Path to the DEM file for background in the plot (optional).
+    
+    Returns:
+    - fig, ax: Figure and axes objects of the plot.
+    """
+    fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={'projection': ccrs.PlateCarree()}, dpi=200)
+    
+    # Set map extent if bounds are provided, else plot the entire range
+    if bounds and len(bounds) == 4:
+        lon_min, lon_max, lat_min, lat_max = bounds
+        ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    
+    # Plot DEM as background if provided
+    if dem_path:
+        with rasterio.open(dem_path) as dem:
+            dem_data = dem.read(1)  # Read the first band
+            dem_extent = [dem.bounds.left, dem.bounds.right, dem.bounds.bottom, dem.bounds.top]
+            ax.imshow(dem_data, origin='upper', extent=dem_extent, transform=ccrs.PlateCarree(), cmap='terrain', alpha=0.5)
+
+    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
+    ax.add_feature(cartopy.feature.OCEAN, facecolor='lightblue')
+    ax.coastlines()
+    ax.add_feature(cartopy.feature.BORDERS, linestyle='-', edgecolor='black')
+    ax.gridlines(color='gray', linestyle='--', linewidth=0.5)
+
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
+    cbar.set_label(title)
+    im.set_clim(cmin, cmax)
+    plt.show()
+    
+    return fig, ax
+    
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
     # Create a new figure and axes with a Plate Carrée projection
     fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={'projection': ccrs.PlateCarree()}, dpi=200)
@@ -196,6 +244,25 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     
     plt.tight_layout()
     plt.show()
+
+def plot_time_series(coords, longitude, latitude, data, label, x_label='Time', y_label='Soil Moisture'):
+    """
+    Finds the closest pixel for given coordinates and plots the time series.
+    
+    Args:
+    - coords: Tuple of (longitude, latitude).
+    - longitude: 2D array of longitude values.
+    - latitude: 2D array of latitude values.
+    - data: 3D array of data (e.g., SMAP data).
+    - label: Label for the plot.
+    - x_label: Label for the x-axis.
+    - y_label: Label for the y-axis.
+    """
+    closest_pixel_index = Data.find_closest_index(longitude, latitude, coords)
+    time_series = data[closest_pixel_index[0], closest_pixel_index[1], :]
+    plt.plot(time_series, '.-', label=label)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
 
 def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output_gif_path, start_index, end_index, padding, cmap='jet', duration=500, threshold_value=None, resampling=False, target_lon=False, target_lat=False):
     images = []
