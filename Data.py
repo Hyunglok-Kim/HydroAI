@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 from scipy.ndimage import zoom
 from functools import partial
 from tqdm import tqdm
+from scipy.spatial import cKDTree
 
 if platform.system() == 'Darwin':  # macOS
     import multiprocessing as mp
@@ -191,3 +192,9 @@ def moving_average_3d(data, window_size):
         moving_averaged[:, :, k] = np.nanmean(padded_data[:, :, k:k+window_size], axis=2)
     
     return moving_averaged
+
+def find_closest_index(longitudes, latitudes, point):
+    lon_lat = np.c_[longitudes.ravel(), latitudes.ravel()]
+    tree = cKDTree(lon_lat)
+    dist, idx = tree.query(point, k=1)
+    return np.unravel_index(idx, latitudes.shape)
