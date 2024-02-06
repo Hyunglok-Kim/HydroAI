@@ -159,7 +159,7 @@ def create_array_from_h5(file_list, data_doy, year, cpuserver_data_FP, mission_p
     
     return data_array, longitude, latitude
 
-def create_netcdf_file(nc_file, latitude, longitude, **data_vars):
+def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     """
     Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
 
