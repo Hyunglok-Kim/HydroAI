@@ -8,7 +8,7 @@ import os
 
 # Define the majority filter function
 def majority_filter(data, size=3, nodata=-9999):
-    """
+    """1
     Apply a majority filter to the input data.
     Args:
     - data: 2D array of data to be filtered.
