@@ -6,7 +6,7 @@ from rasterio.warp import calculate_default_transform, reproject
 import rioxarray
 import os
 
-# Define the majority filter function11
+# Define the majority filter function
 def majority_filter(data, size=3, nodata=-9999):
     """
     Apply a majority filter to the input data.
