@@ -14,9 +14,9 @@ from tqdm import tqdm
 from PIL import Image
 import rioxarray
 
-from hydroAI.LIS_LSM import get_variable_from_nc
-from hydroAI.Data import Resampling
-import hydroAI.Data as Data
+from HydroAI.LIS_LSM import get_variable_from_nc
+from HydroAI.Data import Resampling
+import HydroAI.Data as Data
 
 def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
     """
