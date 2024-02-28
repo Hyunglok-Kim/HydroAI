@@ -44,7 +44,7 @@ logger = logging.getLogger('pymc3')
 logger.setLevel(logging.ERROR)
 
 # use load_data function from Data module to do not reset cache
-from hydroAI.Data import load_data
+from HydroAI.Data import load_data
     
 def bc_p_pred_integrated(lam, dsm, SM1, SM2, dt, p, asm, r, et, infilt, z, a, b, d=0, K1=0, K2=0, event_opt = 'P_dry_period'):
     
