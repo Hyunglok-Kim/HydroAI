@@ -53,11 +53,12 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
     ax.add_feature(cartopy.feature.OCEAN, facecolor='lightblue')
     ax.coastlines()
     ax.add_feature(cartopy.feature.BORDERS, linestyle='-', edgecolor='black')
-    ax.gridlines(color='gray', linestyle='--', linewidth=0.5)
-
+    ax.gridlines(draw_labels=True, color='gray', linestyle='--', linewidth=0.5)
+    
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
     im.set_clim(cmin, cmax)
+
     plt.show()
     
     return fig, ax

@@ -14,9 +14,9 @@ from tqdm import tqdm
 from PIL import Image
 import rioxarray
 
-from hydroAI.LIS_LSM import get_variable_from_nc
-from hydroAI.Data import Resampling
-import hydroAI.Data as Data
+from HydroAI.LIS_LSM import get_variable_from_nc
+from HydroAI.Data import Resampling
+import HydroAI.Data as Data
 
 def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
     """
@@ -53,11 +53,12 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
     ax.add_feature(cartopy.feature.OCEAN, facecolor='lightblue')
     ax.coastlines()
     ax.add_feature(cartopy.feature.BORDERS, linestyle='-', edgecolor='black')
-    ax.gridlines(color='gray', linestyle='--', linewidth=0.5)
-
+    ax.gridlines(draw_labels=True, color='gray', linestyle='--', linewidth=0.5)
+    
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
     im.set_clim(cmin, cmax)
+
     plt.show()
     
     return fig, ax
