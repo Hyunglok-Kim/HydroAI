@@ -1,6 +1,7 @@
 import os
 from netCDF4 import Dataset
 import numpy as np
+import datetime
 
 def get_nc_file_paths(base_dir, contain='_HIST_'):
     """
@@ -22,7 +23,7 @@ def get_nc_file_paths(base_dir, contain='_HIST_'):
                 nc_file_paths.append(full_path)
 
     # Sort the file paths in descending order
-    nc_file_paths.sort
+    nc_file_paths.sort()
     
     return nc_file_paths
 
@@ -61,15 +62,18 @@ def get_nc_variable_names_units(nc_file_path):
 #variables = get_nc_variable_list(nc_file)
 #print("Variables in the NC file:", variables)
 
+from netCDF4 import Dataset
+import numpy as np
+
 def get_variable_from_nc(nc_file_path, variable_name, layer_index=0):
     """
-    Extract a specific layer (if 3D) or the entire array (if 2D) of a variable 
+    Extract a specific layer (if 3D), the entire array (if 2D or 1D), or the value (if 0D) of a variable
     from a NetCDF file and return it as a NumPy array, with fill values replaced by np.nan.
 
     :param nc_file_path: Path to the NetCDF file.
     :param variable_name: Name of the variable to extract.
     :param layer_index: The index of the layer to extract if the variable is 3D. Default is 0.
-    :return: NumPy array of the specified layer or the entire variable data, with np.nan for fill values.
+    :return: NumPy array or scalar of the specified variable data, with np.nan for fill values.
     """
     with Dataset(nc_file_path, 'r') as nc:
         # Check if the variable exists in the NetCDF file
@@ -82,21 +86,67 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0):
             # Extract data based on the number of dimensions
             if variable.ndim == 3:
                 # Extract the specified layer for 3D variables
-                layer_data = variable[layer_index, :, :]
+                data = variable[layer_index, :, :]
             elif variable.ndim == 2:
                 # Extract all data for 2D variables
-                layer_data = variable[:]
+                data = variable[:, :]
+            elif variable.ndim == 1:
+                # Extract all data for 1D variables
+                data = variable[:]
+            elif variable.ndim == 0:
+                # Extract scalar value for 0D variables
+                data = variable.scalar()
             else:
-                raise ValueError(f"Variable '{variable_name}' is not 2D or 3D and is not supported by this function.")
+                raise ValueError(f"Variable '{variable_name}' has unsupported number of dimensions: {variable.ndim}.")
+
+            # Handle fill values (mask to NaN if necessary)
+            if isinstance(data, np.ma.MaskedArray):
+                data = data.filled(np.nan)
             
-            # Convert masked array to a regular array with np.nan for fill values
-            return np.flipud(layer_data.filled(np.nan))
+            # Flip the data upside down if it's 2D or 3D (common in geographical data to match orientation)
+            if variable.ndim in [2, 3]:
+                data = np.flipud(data)
+
+            return data
         else:
             raise ValueError(f"Variable '{variable_name}' does not exist in the NetCDF file.")
-            
+
 # Example usage:
 #nc_file = nc_paths[0]
 #nth_layer = 0  # Replace with the layer index you want to extract if variable is 3D
 #variable_layer_data = get_variable_layer_from_nc(nc_file, 'lat',layer_index=nth_layer)
 #print(f"Data for variable '{variable_name}':")
 #print(variable_layer_data)
+
+def parse_date_from_path(file_path):
+    """
+    Extracts the datetime from the file path based on a known pattern.
+    Assumes file names contain dates in the format 'yyyymmddhhmm' directly before '.d01.nc'.
+    """
+    date_str = file_path.split('_')[-1][:-7]  # Get the date part just before '.d01.nc'
+    return datetime.datetime.strptime(date_str, '%Y%m%d%H%M')
+
+def find_date_index(nc_file_paths, target_date_str):
+    """
+    Finds the index of the file in nc_file_paths whose date is closest to the target_date_str.
+    
+    :param nc_file_paths: List of file paths containing date strings.
+    :param target_date_str: Target date string in 'yyyymmddhhmmss' format.
+    :return: Index of the file closest to the specified date.
+    """
+    target_date = datetime.datetime.strptime(target_date_str, '%Y%m%d%H%M%S')
+
+    # Initialize variables to keep track of the minimum difference and the index
+    min_diff = float('inf')
+    closest_index = -1
+
+    # Loop through each file, parse the date, calculate difference, and update the closest index
+    for index, file_path in enumerate(nc_file_paths):
+        file_date = parse_date_from_path(file_path)
+        diff = abs((target_date - file_date).total_seconds())  # Difference in seconds
+
+        if diff < min_diff:
+            min_diff = diff
+            closest_index = index
+
+    return closest_index
