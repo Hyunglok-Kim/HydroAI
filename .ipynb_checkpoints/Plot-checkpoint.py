@@ -110,9 +110,11 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
 
     im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
     ax.add_feature(cartopy.feature.OCEAN, facecolor='lightblue')
-    ax.coastlines()
+    ax.coastlines(resolution='10m')
     ax.add_feature(cartopy.feature.BORDERS, linestyle='-', edgecolor='black')
-    ax.gridlines(color='gray', linestyle='--', linewidth=0.5)
+    gl = ax.gridlines(draw_labels=True, color='gray', linestyle='--', linewidth=0.5)
+    gl.top_labels = False
+    gl.right_labels = False
 
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
