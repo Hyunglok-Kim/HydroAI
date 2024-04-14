@@ -323,12 +323,12 @@ def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output
             data[data < threshold_value] = np.nan  # Set values below the threshold to nan
         
         # Extract date from the filename using regex
-        date_match = re.search(r'\d{8}', nc_paths[i])
+        date_match = re.search(r'\d{12}', nc_paths[i])
         date_str = date_match.group(0) if date_match else 'Unknown Date'
         
         # Convert the date string to a more readable format if necessary
         # For example, '20150101' becomes '2015-01-01'
-        formatted_date = f'{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}'
+        formatted_date = f'{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}:{date_str[8:12]}'
         
         # Plot the data with fixed color scale and add the date as title
         if resampling:
