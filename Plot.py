@@ -6,9 +6,12 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+
 import cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import cartopy.mpl.gridliner as gridliner
+
 import rasterio
 from tqdm import tqdm
 from PIL import Image
@@ -17,6 +20,13 @@ import rioxarray
 from HydroAI.LIS_LSM import get_variable_from_nc
 from HydroAI.Data import Resampling
 import HydroAI.Data as Data
+
+# Set default font sizes using rcParams to ensure consistency
+plt.rcParams['grid.linewidth'] = 1
+plt.rcParams['axes.titlesize'] = 15  # Title size
+plt.rcParams['axes.labelsize'] = 15  # Axis labels (x, y)
+plt.rcParams['xtick.labelsize'] = 15 # X tick labels
+plt.rcParams['ytick.labelsize'] = 15 # Y tick labels
 
 def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
     """
@@ -35,13 +45,17 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
     Returns:
     - fig, ax: Figure and axes objects of the plot.
     """
-    fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={'projection': ccrs.PlateCarree()}, dpi=200)
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
     
-    # Set map extent if bounds are provided, else plot the entire range
-    if bounds and len(bounds) == 4:
-        lon_min, lon_max, lat_min, lat_max = bounds
-        ax.set_extent([lon_min, lon_max, lat_min, lat_max], crs=ccrs.PlateCarree())
+    # Calculate the extent from the longitude and latitude
+    extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
     
+    # Set map extent if bounds are provided, else use the calculated extent
+    if bounds:
+        ax.set_extent(bounds, crs=ccrs.PlateCarree())
+    else:
+        ax.set_extent(extent, crs=ccrs.PlateCarree())
+
     # Plot DEM as background if provided
     if dem_path:
         with rasterio.open(dem_path) as dem:
@@ -49,12 +63,20 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
             dem_extent = [dem.bounds.left, dem.bounds.right, dem.bounds.bottom, dem.bounds.top]
             ax.imshow(dem_data, origin='upper', extent=dem_extent, transform=ccrs.PlateCarree(), cmap='terrain', alpha=0.5)
 
-    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
-    ax.add_feature(cartopy.feature.OCEAN, facecolor='lightblue')
+    # Plot the data using imshow instead of pcolormesh
+    im = ax.imshow(values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax, extent=extent, origin='upper', interpolation='nearest')
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
     ax.coastlines()
-    ax.add_feature(cartopy.feature.BORDERS, linestyle='-', edgecolor='black')
-    ax.gridlines(draw_labels=True, color='gray', linestyle='--', linewidth=0.5)
-    
+    ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
+   
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='black', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xformatter = gridliner.LONGITUDE_FORMATTER
+    gl.yformatter = gridliner.LATITUDE_FORMATTER
+    gl.xlabel_style = {'size': 15, 'color': 'black'}
+    gl.ylabel_style = {'size': 15, 'color': 'black'}
+
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
     im.set_clim(cmin, cmax)
@@ -62,6 +84,7 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
     plt.show()
     
     return fig, ax
+
     
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
     # Create a new figure and axes with a Plate Carrée projection
@@ -115,6 +138,8 @@ def plot_regional_map(longitude, latitude, values, title, cmin, cmax, padding, c
     gl = ax.gridlines(draw_labels=True, color='gray', linestyle='--', linewidth=0.5)
     gl.top_labels = False
     gl.right_labels = False
+    gl.xlabel_style = {'size': 15, 'color': 'black'}
+    gl.ylabel_style = {'size': 15, 'color': 'black'}
 
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
     cbar.set_label(title)
