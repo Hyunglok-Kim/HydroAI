@@ -50,9 +50,9 @@ def process_files(file_names, ref_points, data_shape):
 def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
-    nc_file_list = nc_file_list[:5000]
-    #ref_lon, ref_lat = hSMAP.get_e2grid(cpuserver_data_FP, 'SPL3SMP.006')
-    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid('3km')
+    #nc_file_list = nc_file_list[:5000]
+    resol = '3km'
+    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid(resol)
     
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
@@ -69,7 +69,7 @@ def main():
     final_data_count = np.sum(results, axis=0)
 
     # Save to CSV
-    save_path = "./CYGNSS_data_count.csv"  # Specify your path and filename
+    save_path = "./CYGNSS_data_count_"+resol+".csv"  # Specify your path and filename
     np.savetxt(save_path, final_data_count, delimiter=',')    
 
     # Plotting the results
