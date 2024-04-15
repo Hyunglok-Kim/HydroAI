@@ -19,8 +19,8 @@ else:
 
 # Add Python modules path and import
 sys.path.append(base_FP + '/python_modules')
-import HydroAI.SMAP as hSMAP
-importlib.reload(hSMAP)
+import HydroAI.Grid as hGrid
+importlib.reload(hGrid)
 
 def list_nc_files(base_dir):
     nc_files = []
@@ -51,7 +51,9 @@ def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
     nc_file_list = nc_file_list[:5000]
-    ref_lon, ref_lat = hSMAP.get_e2grid(cpuserver_data_FP, 'SPL3SMP.006')
+    #ref_lon, ref_lat = hSMAP.get_e2grid(cpuserver_data_FP, 'SPL3SMP.006')
+    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid('3km')
+    
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
 
