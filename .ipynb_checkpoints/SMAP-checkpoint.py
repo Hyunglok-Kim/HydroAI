@@ -77,6 +77,12 @@ def get_e2grid(cpuserver_data_FP, mission_product):
     elif mission_product.startswith('SPL3SMP_E.'):
         grid_prefix = 'EASE2_M09km'
         shape = (3856, 1624)
+    elif mission_product.startswith('25km'):
+        grid_prefix = 'EASE2_M25km'
+        shape = (1388, 584)
+    elif mission_product.startswith('3km'):
+        grid_prefix = 'EASE2_M03km'
+        shape = (11568, 4872)
     else:
         return None, None  # or some default value, or raise an error
 
