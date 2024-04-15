@@ -48,14 +48,14 @@ def process_files(file_names, ref_points, data_shape):
     return local_data_count
 
 def main():
-    base_dir = "/Users/hyunglokkim/cpuserver_data/CYGNSS/L1_V21"
+    base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
-    #nc_file_list = nc_file_list[:5000]
+    nc_file_list = nc_file_list[:5000]
     ref_lon, ref_lat = hSMAP.get_e2grid(cpuserver_data_FP, 'SPL3SMP.006')
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
 
-    num_processes = 40
+    num_processes = 180
     chunk_size = len(nc_file_list) // num_processes + (len(nc_file_list) % num_processes > 0)
     
     pool = Pool(processes=num_processes)
