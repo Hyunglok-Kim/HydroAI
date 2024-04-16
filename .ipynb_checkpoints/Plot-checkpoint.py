@@ -6,6 +6,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.colors import ListedColormap
 
 import cartopy
 import cartopy.crs as ccrs
@@ -13,6 +14,7 @@ import cartopy.feature as cfeature
 import cartopy.mpl.gridliner as gridliner
 
 import rasterio
+from rasterio.plot import show
 from tqdm import tqdm
 from PIL import Image
 import rioxarray
@@ -273,6 +275,114 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     plt.tight_layout()
     plt.show()
 
+def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12C1 LULC map', bounds=None):
+    """
+    Plots MCD12C1 land cover data directly from given longitude, latitude, and LULC values,
+    applying color mapping based on the LULC type.
+
+    Args:
+    longitude (numpy.ndarray): 2D array of longitude values.
+    latitude (numpy.ndarray): 2D array of latitude values.
+    values (numpy.ndarray): 2D array of LULC data values.
+    lulc_type (int): The LULC type version (1, 2, or 3) for color mapping.
+    title (str): Title for the plot.
+    bounds (list): Geographic bounds as [lon_min, lon_max, lat_min, lat_max] for the map extent.
+    """
+    # Define color mappings for each LULC type
+    class_names_and_colors = {
+        1: {  # Type 1
+            0: ('Water', '#4682B4'),
+            1: ('Evergreen Needleleaf Forest', '#006400'),
+            2: ('Evergreen Broadleaf Forest', '#228B22'),
+            3: ('Deciduous Needleleaf Forest', '#8FBC8F'),
+            4: ('Deciduous Broadleaf Forest', '#90EE90'),
+            5: ('Mixed Forests', '#32CD32'),
+            6: ('Closed Shrublands', '#FFD700'),
+            7: ('Open Shrublands', '#FFA500'),
+            8: ('Woody Savannas', '#FF8C00'),
+            9: ('Savannas', '#BDB76B'),
+            10: ('Grasslands', '#F0E68C'),
+            11: ('Permanent Wetlands', '#E0FFFF'),
+            12: ('Croplands', '#FFFFE0'),
+            13: ('Urban and Built-up', '#D3D3D3'),
+            14: ('Cropland/Natural Vegetation Mosaic', '#FAFAD2'),
+            15: ('Snow and Ice', '#FFFFFF'),
+            16: ('Barren or Sparsely Vegetated', '#A9A9A9')
+        },
+        2: {  # Type 2
+            0: ('Water', '#4682B4'),
+            1: ('Evergreen Needleleaf Forest', '#006400'),
+            2: ('Evergreen Broadleaf Forest', '#228B22'),
+            3: ('Deciduous Needleleaf Forest', '#8FBC8F'),
+            4: ('Deciduous Broadleaf Forest', '#90EE90'),
+            5: ('Mixed Forests', '#32CD32'),
+            6: ('Closed Shrublands', '#FFD700'),
+            7: ('Open Shrublands', '#FFA500'),
+            8: ('Woody Savannas', '#FF8C00'),
+            9: ('Savannas', '#BDB76B'),
+            10: ('Grasslands', '#F0E68C'),
+            12: ('Croplands', '#FFFFE0'),
+            13: ('Urban and Built-up', '#D3D3D3'),
+            15: ('Barren or Sparsely Vegetated', '#A9A9A9')
+        },
+        3: {  # Type 3
+            0: ('Water', '#4682B4'),
+            1: ('Grasses/Cereal', '#9ACD32'),
+            2: ('Shrubs', '#8B4513'),
+            3: ('Broadleaf Crops', '#32CD32'),
+            4: ('Savannah', '#FAFAD2'),
+            5: ('Evergreen Broadleaf Forest', '#006400'),
+            6: ('Deciduous Broadleaf Forest', '#8FBC8F'),
+            7: ('Evergreen Needleleaf Forest', '#228B22'),
+            8: ('Deciduous Needleleaf Forest', '#90EE90'),
+            9: ('Unvegetated', '#D3D3D3'),
+            10: ('Urban', '#696969')
+        }
+    }
+
+    # Create a colormap from the defined colors
+    max_value = max(class_names_and_colors[lulc_type].keys())
+    cmap_colors = [class_names_and_colors[lulc_type][i][1] for i in sorted(class_names_and_colors[lulc_type])]
+    labels = [class_names_and_colors[lulc_type][i][0] for i in sorted(class_names_and_colors[lulc_type])]
+    cmap = ListedColormap(cmap_colors)
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+    ax.set_title(title)
+
+    # Set geographic bounds if specified
+    if bounds:
+        ax.set_extent(bounds, crs=ccrs.PlateCarree())
+
+    # Add map features
+    ax.add_feature(cfeature.LAND, facecolor='lightgray')
+    ax.add_feature(cfeature.OCEAN, facecolor='azure')
+    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+
+    # Plot the data
+    mesh = ax.pcolormesh(longitude, latitude, values, cmap=cmap, transform=ccrs.PlateCarree())
+
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='black', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xformatter = gridliner.LONGITUDE_FORMATTER
+    gl.yformatter = gridliner.LATITUDE_FORMATTER
+    gl.xlabel_style = {'size': 15, 'color': 'black'}
+    gl.ylabel_style = {'size': 15, 'color': 'black'}
+    
+    # Add a colorbar with legend
+    #cbar = plt.colorbar(mesh, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
+    #cbar.set_label('Land Cover Type')
+    #cbar.set_ticks(np.linspace(0, 1, len(labels)))
+    #cbar.set_ticklabels(labels)
+
+    # Create legend patches for detailed legend
+    legend_patches = [mpatches.Patch(color=cmap_colors[i], label=labels[i]) for i in range(len(labels))]
+    # Display the legend in 4 columns as requested
+    legend = ax.legend(handles=legend_patches, title='Land Cover Classes', loc='upper center', bbox_to_anchor=(0.5, -0.1), fancybox=True, shadow=False, ncol=3)
+
+    plt.show()
 
 def plot_time_series(coords, longitude, latitude, data, label, x_label='Time', y_label='Soil Moisture'):
     """

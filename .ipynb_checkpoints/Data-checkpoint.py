@@ -8,6 +8,10 @@ from scipy.ndimage import zoom
 from functools import partial
 from tqdm import tqdm
 from scipy.spatial import cKDTree
+import os
+import glob
+
+from pyhdf.SD import SD, SDC
 
 if platform.system() == 'Darwin':  # macOS
     import multiprocessing as mp
@@ -241,3 +245,100 @@ def average_over_space(X):
     mean_values = np.nanmean(X, axis=(0, 1))
     
     return mean_values
+
+def get_file_list(directory_path, file_extension, recursive=True, filter_strs=None):
+    """
+    Lists all files in the specified directory and its subdirectories (if recursive is True)
+    with the given file extension. Optionally filters files to include only those containing any of the specified substrings.
+
+    Args:
+    directory_path (str): The path to the directory where the files are located.
+    file_extension (str): The file extension to search for.
+    recursive (bool): Whether to search files recursively in subdirectories.
+    filter_strs (list of str, optional): List of substrings that must be included in the filenames.
+
+    Returns:
+    list: A list of full file paths matching the given file extension and containing any of the filter strings (if provided).
+    """
+    # Ensure the file extension starts with a dot
+    if not file_extension.startswith('.'):
+        file_extension = '.' + file_extension
+
+    # Construct the search pattern
+    if recursive:
+        pattern = f"{directory_path}/**/*{file_extension}"
+    else:
+        pattern = f"{directory_path}/*{file_extension}"
+
+    # Get a list of all files matching the pattern
+    file_paths = glob.glob(pattern, recursive=recursive)
+
+    # Filter files to include only those containing any of the filter_strs, if provided
+    if filter_strs:
+        filtered_paths = []
+        for file_path in file_paths:
+            if any(substring in os.path.basename(file_path) for substring in filter_strs):
+                filtered_paths.append(file_path)
+        file_paths = filtered_paths
+
+    return file_paths
+# Example usage
+#directory_path = '/data/X'
+#file_extension = 'hdf'  # Example file format
+# Get all text files
+# all_txt_files = get_file_list(directory, file_ext)
+# Get text files that include "abs", "2021", or "report" in the filename
+# filtered_txt_files = get_file_list(directory, file_ext, filter_strs=["abs", "2021", "report"])
+
+### h4 modules ###
+def inspect_hdf4_file(input_file):
+    """
+    Inspects the contents of an HDF4 file, printing out the names of datasets.
+
+    Args:
+    input_file (str): The path to the HDF4 file to inspect.
+    """
+    try:
+        # Open the HDF4 file in read mode
+        hdf = SD(input_file, SDC.READ)
+        print("Contents of the HDF4 file:")
+        datasets = hdf.datasets()
+        for name, info in datasets.items():
+            # Print basic information about each dataset
+            print(f"Dataset: {name}")
+            print(f" - Dimensions: {info[0]}")
+            print(f" - Type: {info[3]}")
+            # Optionally print the type of data stored
+            data = hdf.select(name)
+            print(f" - Data Type: {data.info()[3]}")
+            data.endaccess()
+    except Exception as e:
+        print(f"Failed to read HDF4 file: {e}")
+
+def read_hdf4_variable(input_file, variable_name):
+    """
+    Reads a specified variable from an HDF4 file.
+
+    Args:
+    input_file (str): The path to the HDF4 file.
+    variable_name (str): The name of the variable to read.
+
+    Returns:
+    numpy.ndarray: The data of the specified variable, or None if an error occurs.
+    """
+    try:
+        # Open the HDF4 file in read mode
+        hdf = SD(input_file, SDC.READ)
+        # Select the dataset by the variable name
+        dataset = hdf.select(variable_name)
+        # Read the data from the dataset
+        data = dataset[:]
+        # Clean up: end access to the dataset
+        dataset.endaccess()
+        # Return the data array
+        return data
+
+    except Exception as e:
+        print(f"Failed to read '{variable_name}' from HDF4 file {input_file}: {e}")
+        return None
+### ------------------------------------------- ###

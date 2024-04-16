@@ -28,7 +28,7 @@ def get_e2_grid(resolution_key):
     )
     return grid
 
-def generate_lat_lon_e2grid(resolution_key):
+def generate_lon_lat_e2grid(resolution_key):
     # Initialize the grid using the previous function
     grid = get_e2_grid(resolution_key)
 
@@ -52,3 +52,45 @@ def generate_lat_lon_e2grid(resolution_key):
             print(f"Processing row {row}/{n_rows}")
 
     return longitudes, latitudes
+
+### ----------------------------------------------- ###
+def generate_lon_lat_eqdgrid(*args):
+    """
+    Generates 2D arrays of latitudes and longitudes. The function can either take a single argument specifying the 
+    resolution in degrees or two arguments specifying the number of latitude and longitude points.
+
+    Args:
+    *args: Variable length argument list. Can be either a single float indicating resolution in degrees, or two
+           integers indicating the number of latitude and longitude points (grid rows and columns).
+
+    Returns:
+    tuple: Two 2D numpy arrays containing the latitude and longitude values respectively.
+    """
+    if len(args) == 1:
+        # Assume single argument is the resolution in degrees
+        resolution = args[0]
+        y_dim = int(180 / resolution)
+        x_dim = int(360 / resolution)
+    elif len(args) == 2:
+        # Two arguments specifying the grid dimensions
+        y_dim, x_dim = args
+    else:
+        raise ValueError("Invalid number of arguments. Provide either resolution or dimensions.")
+
+    # Calculate the size of each pixel
+    lat_step = 180 / y_dim
+    lon_step = 360 / x_dim
+
+    # Calculate latitude and longitude values starting from the center of the first pixel
+    latitudes = np.linspace(90 - lat_step / 2, -90 + lat_step / 2, y_dim)
+    longitudes = np.linspace(-180 + lon_step / 2, 180 - lon_step / 2, x_dim)
+
+    # Mesh the latitude and longitude values to create 2D arrays
+    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
+    return lon_grid, lat_grid
+
+# Example usage
+#y_dim = 3600  # Number of latitude points
+#x_dim = 7200  # Number of longitude points
+#lat_grid, lon_grid = create_geo_grid(y_dim, x_dim)
+#lat_grid, lon_grid = create_geo_grid('0.05')
