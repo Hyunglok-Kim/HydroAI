@@ -20,17 +20,8 @@ else:
 # Add Python modules path and import
 sys.path.append(base_FP + '/python_modules')
 import HydroAI.Grid as hGrid
+import HydroAI.Data as hData
 importlib.reload(hGrid)
-
-def list_nc_files(base_dir):
-    nc_files = []
-    for root, dirs, files in os.walk(base_dir):
-        for file in files:
-            if file.endswith(".nc4"):
-                full_path = os.path.join(root, file)
-                nc_files.append(full_path)
-    nc_files.sort()
-    return nc_files
 
 def process_files(file_names, ref_points, data_shape):
     local_data_count = np.zeros(data_shape, dtype=int)
@@ -49,7 +40,7 @@ def process_files(file_names, ref_points, data_shape):
 
 def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
-    nc_file_list = list_nc_files(base_dir)
+    nc_file_list = hData.get_file_list(base_dir, 'nc4')
     #nc_file_list = nc_file_list[:5000]
     resol = '3km'
     ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid(resol)
