@@ -33,6 +33,8 @@ def list_nc_files(base_dir):
     return nc_files
 
 def process_files(file_names, ref_points, data_shape):
+    local_angle_sum = np.zeros(data_shape, dtype=float)
+    local_angle_sum_sq = np.zeros(data_shape, dtype=float)
     local_data_count = np.zeros(data_shape, dtype=int)
     tree = cKDTree(ref_points)
     
@@ -40,19 +42,24 @@ def process_files(file_names, ref_points, data_shape):
         dataset = nc.Dataset(file_name)
         sp_lat = dataset.variables['sp_lat'][:].flatten().compressed()
         sp_lon = dataset.variables['sp_lon'][:].flatten().compressed() - 180
+        sp_inc_angle = dataset.variables['sp_inc_angle'][:].flatten().compressed()
+        
         sat_points = np.column_stack((sp_lat, sp_lon))
         _, indices = tree.query(sat_points)
         rows, cols = np.unravel_index(indices, data_shape)
-        np.add.at(local_data_count, (rows, cols), 1)
+
+        for row, col, angle in zip(rows, cols, sp_inc_angle):
+            local_angle_sum[row, col] += angle
+            local_angle_sum_sq[row, col] += angle ** 2
+            local_data_count[row, col] += 1
     
-    return local_data_count
+    return local_angle_sum, local_angle_sum_sq, local_data_count
 
 def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
-    nc_file_list = nc_file_list[:5000]
-    #ref_lon, ref_lat = hSMAP.get_e2grid(cpuserver_data_FP, 'SPL3SMP.006')
-    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid('3km')
+    resol = '3km'
+    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid(resol)
     
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
@@ -66,13 +73,16 @@ def main():
     pool.join()
     
     # Aggregate results
-    final_data_count = np.sum(results, axis=0)
+    final_angle_sum = np.sum([result[0] for result in results], axis=0)
+    final_angle_sum_sq = np.sum([result[1] for result in results], axis=0)
+    final_data_count = np.sum([result[2] for result in results], axis=0)
 
     # Save to CSV
-    save_path = "./CYGNSS_data_count.csv"  # Specify your path and filename
-    np.savetxt(save_path, final_data_count, delimiter=',')    
+    np.savetxt(f"./CYGNSS_angle_sum_{resol}.csv", final_angle_sum, delimiter=',')
+    np.savetxt(f"./CYGNSS_angle_sum_sq_{resol}.csv", final_angle_sum_sq, delimiter=',')
+    np.savetxt(f"./CYGNSS_data_count_{resol}.csv", final_data_count, delimiter=',')    
 
-    # Plotting the results
+    # Optional: Plotting the results for visual confirmation
     plt.figure(figsize=(10, 6))
     im = plt.imshow(final_data_count, cmap='viridis')
     plt.colorbar(im)
@@ -85,4 +95,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
