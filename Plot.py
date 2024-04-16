@@ -66,7 +66,8 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
             ax.imshow(dem_data, origin='upper', extent=dem_extent, transform=ccrs.PlateCarree(), cmap='terrain', alpha=0.5)
 
     # Plot the data using imshow instead of pcolormesh
-    im = ax.imshow(values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax, extent=extent, origin='upper', interpolation='nearest')
+    #im = ax.imshow(values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax, extent=extent, origin='upper', interpolation='nearest')
+    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap)
     ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
     ax.coastlines()
     ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
