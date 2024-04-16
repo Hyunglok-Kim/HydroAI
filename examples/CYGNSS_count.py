@@ -78,9 +78,9 @@ def main():
     final_data_count = np.sum([result[2] for result in results], axis=0)
 
     # Save to CSV
-    np.savetxt(f"./CYGNSS_angle_sum_{resol}.csv", final_angle_sum, delimiter=',')
-    np.savetxt(f"./CYGNSS_angle_sum_sq_{resol}.csv", final_angle_sum_sq, delimiter=',')
-    np.savetxt(f"./CYGNSS_data_count_{resol}.csv", final_data_count, delimiter=',')    
+    np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_angle_sum_{resol}.csv", final_angle_sum, delimiter=',')
+    np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_angle_sum_sq_{resol}.csv", final_angle_sum_sq, delimiter=',')
+    np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_data_count_{resol}.csv", final_data_count, delimiter=',')    
 
     # Optional: Plotting the results for visual confirmation
     plt.figure(figsize=(10, 6))
