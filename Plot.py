@@ -425,10 +425,10 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
     labels = [class_names_and_colors[lulc_type][i][0] for i in sorted(class_names_and_colors[lulc_type])]
     cmap = ListedColormap(cmap_colors)
 
-    # Create the plot
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
-    ax.set_title(title, fontsize=16, y=0.67)
-
+    # Create the plot
+    fig.suptitle(title, fontsize=16, y=0.73)
+    
     # Set geographic bounds if specified
     if bounds:
         ax.set_extent(bounds, crs=ccrs.PlateCarree())
