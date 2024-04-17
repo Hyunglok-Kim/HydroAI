@@ -354,7 +354,7 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     plt.tight_layout()
     plt.show()
 
-def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12C1 LULC map', bounds=None):
+def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12C1 LULC map', projection='Mollweide', bounds=None):
     """
     Plots MCD12C1 land cover data directly from given longitude, latitude, and LULC values,
     applying color mapping based on the LULC type.
@@ -426,7 +426,7 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
     cmap = ListedColormap(cmap_colors)
 
     # Create the plot
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     ax.set_title(title)
 
     # Set geographic bounds if specified
