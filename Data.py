@@ -60,6 +60,43 @@ def load_data(input_fp, file_name, engine="c", clear_cache=False):
 def mode_function(x):
     return x.mode().iloc[0]
 
+def Resampling_new(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+    def magnify_VAR(lat_input, lon_input, VAR, mag_factor):
+        # Rescale lon and lat using bilinear interpolation (order=1)
+        m_lon = zoom(lon_input, mag_factor, order=1)
+        m_lat = zoom(lat_input, mag_factor, order=1)
+        m_values = zoom(VAR, mag_factor, order=0)  # Nearest neighbor interpolation
+        return m_lat, m_lon, m_values
+    
+    # Check if magnification is needed
+    if lat_target.shape > lat_input.shape:
+        lat_input, lon_input, VAR = magnify_VAR(lat_input, lon_input, VAR, mag_factor)
+
+    # Flatten the target and input coordinates
+    target_coords = np.column_stack([lat_target.ravel(), lon_target.ravel()])
+    input_coords = np.column_stack([lat_input.ravel(), lon_input.ravel()])
+
+    # Create a KDTree for fast nearest-neighbor lookup
+    tree = cKDTree(input_coords)
+
+    # Find the nearest neighbors in the input data for each target location
+    distances, indices = tree.query(target_coords, k=1)  # k=1 for nearest neighbor
+
+    # Using the indices to map input data to target data grid
+    resampled_VAR = VAR.ravel()[indices].reshape(lat_target.shape)
+
+    # Handling aggregation if necessary
+    if agg_method != 'mean':  # 'mean' is handled by default above
+        # Example: Handling other aggregation methods
+        df = pd.DataFrame({'values': resampled_VAR.ravel(), 'indices': indices})
+        if agg_method == 'max':
+            resampled_VAR = df.groupby('indices')['values'].max().values.reshape(lat_target.shape)
+        elif agg_method == 'min':
+            resampled_VAR = df.groupby('indices')['values'].min().values.reshape(lat_target.shape)
+        # Implement other aggregations as needed
+
+    return resampled_VAR
+    
 def Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
     #--------------------------BEGIN NOTE------------------------------%
     # University of Virginia
