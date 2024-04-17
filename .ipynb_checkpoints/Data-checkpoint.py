@@ -60,7 +60,36 @@ def load_data(input_fp, file_name, engine="c", clear_cache=False):
 def mode_function(x):
     return x.mode().iloc[0]
 
-def Resampling_new(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+def Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+    #--------------------------BEGIN NOTE------------------------------%
+    # University of Virginia
+    # USDA
+    # HydroAI lab in GIST
+    #--------------------------END NOTE--------------------------------%
+    # ARGUMENTS:
+    # lat_target/ lon_target : Target frame lat/lon data (m x n arrays)
+    # lat_input / lon_input : Satellite lat/lon data (m' x n' arrays)
+    # (NOTE: lat(i,1)>lat(i+1,1) (1<=i<=(size(lat_main,1)-1))
+    #        lon(1,i)<lon(1,i+1) (1<=i<=(size(lon_main,2)-1)) )
+    #
+    # VAR : Satellite's variable (m' x n' array)
+    # method: Method for resampling: (e.g., 'nearest')
+    #
+    # sampling_method: determines the interpolation method or algorithm to be used
+    #             (e.g., linear, nearest, zero, slinear, quadratic, cubic)
+    # agg_method: determines the interpolation order to use when resizing the input array
+    #             (e.g., mean, median, mode, min, max)
+    #
+    # DESCRIPTION:
+    # This code resampled earth coordinates of the specified domain for 
+    # any "target" projection
+    #
+    # REVISION HISTORY: 
+    # 2 Jul 2020 Hyunglok Kim; initial specification in Matlab
+    # 16 May 2023 Hyunglok Kim; converted to Python code
+    # 17 Apr 2024 Hyunglok Kim; algorithm updated with cKDTree algorithm
+    #-----------------------------------------------------------------%
+    
     def magnify_VAR(lat_input, lon_input, VAR, mag_factor):
         # Rescale lon and lat using bilinear interpolation (order=1)
         m_lon = zoom(lon_input, mag_factor, order=1)
@@ -97,7 +126,7 @@ def Resampling_new(lat_target, lon_target, lat_input, lon_input, VAR, sampling_m
 
     return resampled_VAR
     
-def Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+def Resampling_old(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
     #--------------------------BEGIN NOTE------------------------------%
     # University of Virginia
     # USDA
