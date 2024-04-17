@@ -30,7 +30,7 @@ plt.rcParams['axes.labelsize'] = 15  # Axis labels (x, y)
 plt.rcParams['xtick.labelsize'] = 15 # X tick labels
 plt.rcParams['ytick.labelsize'] = 15 # Y tick labels
 
-def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
+def plot_map_old(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
     """
     Plots a map with the given data, either globally or within specified longitude and latitude bounds.
 
@@ -67,7 +67,7 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
 
     # Plot the data using imshow instead of pcolormesh
     #im = ax.imshow(values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax, extent=extent, origin='upper', interpolation='nearest')
-    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap)
+    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
     ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
     ax.coastlines()
     ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
@@ -88,7 +88,85 @@ def plot_map(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=
     
     return fig, ax
 
+def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None):
+    """
+    Plots a map with the given data, either globally or within specified longitude and latitude bounds.
+
+    Args:
+    - longitude: 2D array of longitude values.
+    - latitude: 2D array of latitude values.
+    - values: 2D array of data values to plot.
+    - title: Title for the colorbar and plot.
+    - cmin, cmax: Minimum and maximum values for the colorbar.
+    - cmap: Colormap to use for plotting data.
+    - projection: Projection to use for the map. Defaults to 'Mollweide'.
+        1.PlateCarree (most common)
+        2.Mercator
+        3.Miller
+        4.Mollweide
+        5.LambertCylindrical
+        6.Robinson
+        7.Sinusoidal
+        8.InterruptedGoodeHomolosine
+        9.Geostationary
+        10.Orthographic
+        11.NorthPolarStereo
+        12.SouthPolarStereo
+        13.AzimuthalEquidistant
+        14.Gnomonic
+        15.Stereographic
+        16.LambertConformal
+        17.AlbersEqualArea
+        18.EquidistantConic
+        19.LambertAzimuthalEqualArea
+        (UTM is available but need to modify the code)
+    - bounds: List or tuple of the format [lon_min, lon_max, lat_min, lat_max] for the map extent. If None, uses full range.
+    - dem_path: Path to the DEM file for background in the plot (optional).
     
+    Returns:
+    - fig, ax: Figure and axes objects of the plot.
+    """
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
+    fig.suptitle(plot_title, fontsize=16, y=0.67)
+    
+    # Calculate the extent from the longitude and latitude
+    extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
+    
+    # Set map extent if bounds are provided, else use the calculated extent
+    if bounds:
+        ax.set_extent(bounds, crs=ccrs.PlateCarree())
+    else:
+        ax.set_global()
+
+    # Plot DEM as background if provided
+    if dem_path:
+        with rasterio.open(dem_path) as dem:
+            dem_data = dem.read(1)  # Read the first band
+            dem_extent = [dem.bounds.left, dem.bounds.right, dem.bounds.bottom, dem.bounds.top]
+            ax.imshow(dem_data, origin='upper', extent=dem_extent, transform=ccrs.PlateCarree(), cmap='terrain', alpha=0.5)
+
+    # Plot the data using pcolormesh
+    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
+    ax.coastlines()
+    ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
+   
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='black', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xformatter = gridliner.LONGITUDE_FORMATTER
+    gl.yformatter = gridliner.LATITUDE_FORMATTER
+    gl.xlabel_style = {'size': 15, 'color': 'black'}
+    gl.ylabel_style = {'size': 15, 'color': 'black'}
+
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.02, shrink=0.5)
+    cbar.set_label(label_title)
+    im.set_clim(cmin, cmax)
+
+    plt.show()
+    
+    return fig, ax
+
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
     # Create a new figure and axes with a Plate Carrée projection
     fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={'projection': ccrs.PlateCarree()}, dpi=200)

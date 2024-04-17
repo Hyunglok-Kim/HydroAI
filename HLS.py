@@ -166,6 +166,52 @@ class SentinelBandPlotter:
             plt.title(title)
         plt.show()
 
+    def plot_false_color(self, title=None):
+
+        # Standard band identifiers for Sentinel-2 RGB composite
+        red_band = 'red'
+        green_band = 'green'
+        nir_band = 'nir'
+
+        # Retrieve data and transforms for each band
+        red, transform = self.band_reader.get_band_with_transform(red_band)
+        green, _ = self.band_reader.get_band_with_transform(green_band)
+        nir, _ = self.band_reader.get_band_with_transform(nir_band)
+
+        # Replace NaNs with zero and infinite values with finite maximums of each array
+        nir = np.nan_to_num(nir, nan=0, posinf=np.nanmax(nir[np.isfinite(nir)]), neginf=0)
+        red = np.nan_to_num(red, nan=0, posinf=np.nanmax(red[np.isfinite(red)]), neginf=0)
+        green = np.nan_to_num(green, nan=0, posinf=np.nanmax(green[np.isfinite(green)]), neginf=0)
+
+        # Normalize each band data to [0, 1] range
+        false_color_image = np.stack((nir, red, green), axis=-1)
+        # Scale the data to [0, 1] if not already scaled
+        # Normalize the data to [0, 1] if not already normalized
+        max_value = np.max(false_color_image)
+        if max_value > 1:
+            false_color_image = false_color_image / max_value
+    
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+        height, width = red.shape
+        west, north = transform * (0, 0)
+        east, south = transform * (width, height)
+        extent = [west, east, south, north]
+        
+        ax.imshow(false_color_image, extent=extent, origin='upper')
+        ax.add_feature(cfeature.COASTLINE)
+
+        gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.xformatter = gridliner.LONGITUDE_FORMATTER
+        gl.yformatter = gridliner.LATITUDE_FORMATTER
+        gl.xlabel_style = {'size': 15, 'color': 'black'}
+        gl.ylabel_style = {'size': 15, 'color': 'black'}
+        
+        if title:
+            plt.title(title)
+        plt.show()
+    
     def plot_index(self, index_variable, transform, threshold=None, cmap='viridis', title=None, bounds=None):
         
         data = index_variable.astype(float)  # Convert to floating-point type
