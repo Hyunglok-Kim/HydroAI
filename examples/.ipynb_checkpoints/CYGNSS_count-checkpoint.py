@@ -96,14 +96,14 @@ def process_files(file_names, ref_points, data_shape):
 def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
-    nc_file_list = nc_file_list[:100]
+    nc_file_list = nc_file_list[:301]
     resol = '36km'
     ref_lon, ref_lat = hGrid.generate_lon_lat_e2grid(resol)
     
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
 
-    num_processes = 180
+    num_processes = 150
     chunk_size = len(nc_file_list) // num_processes + (len(nc_file_list) % num_processes > 0)
     
     pool = Pool(processes=num_processes)
