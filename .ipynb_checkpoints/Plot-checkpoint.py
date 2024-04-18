@@ -427,7 +427,8 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     # Create the plot
-    fig.suptitle(title, fontsize=16, y=0.73)
+    ax.suptitle(title, fontsize=16, y=0.67)
+    fig.suptitle(plot_title, fontsize=16, y=0.67)
     
     # Set geographic bounds if specified
     if bounds:
@@ -459,7 +460,7 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
     # Create legend patches for detailed legend
     legend_patches = [mpatches.Patch(color=cmap_colors[i], label=labels[i]) for i in range(len(labels))]
     # Display the legend in 4 columns as requested
-    legend = ax.legend(handles=legend_patches, title='Land Cover Classes', loc='upper center', bbox_to_anchor=(0.5, -0.02), fancybox=True, shadow=False, ncol=3)
+    legend = ax.legend(handles=legend_patches, title='Land Cover Classes', loc='upper center', bbox_to_anchor=(0.5, -0.1), fancybox=True, shadow=False, ncol=3)
 
     plt.show()
 

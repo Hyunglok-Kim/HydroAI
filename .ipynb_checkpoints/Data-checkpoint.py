@@ -316,15 +316,16 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
     """
     Lists all files in the specified directory and its subdirectories (if recursive is True)
     with the given file extension. Optionally filters files to include only those containing any of the specified substrings.
+    Additionally, sorts the resulting file paths in ascending order.
 
     Args:
-    directory_path (str): The path to the directory where the files are located.
-    file_extension (str): The file extension to search for.
-    recursive (bool): Whether to search files recursively in subdirectories.
-    filter_strs (list of str, optional): List of substrings that must be included in the filenames.
+        directory_path (str): The path to the directory where the files are located.
+        file_extension (str): The file extension to search for.
+        recursive (bool): Whether to search files recursively in subdirectories.
+        filter_strs (list of str, optional): List of substrings that must be included in the filenames.
 
     Returns:
-    list: A list of full file paths matching the given file extension and containing any of the filter strings (if provided).
+        list: A sorted list of full file paths matching the given file extension and containing any of the filter strings (if provided).
     """
     # Ensure the file extension starts with a dot
     if not file_extension.startswith('.'):
@@ -347,7 +348,11 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
                 filtered_paths.append(file_path)
         file_paths = filtered_paths
 
+    # Sort the file paths in ascending order
+    file_paths = sorted(file_paths)
+
     return file_paths
+
 # Example usage
 #directory_path = '/data/X'
 #file_extension = 'hdf'  # Example file format
