@@ -94,7 +94,7 @@ def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
     resol = '3km'
-    ref_lon, ref_lat = hGrid.generate_lat_lon_e2grid(resol)
+    ref_lon, ref_lat = hGrid.generate_lon_lat_e2grid(resol)
     
     data_shape = ref_lat.shape
     ref_points = np.column_stack((ref_lat.flatten(), ref_lon.flatten()))
