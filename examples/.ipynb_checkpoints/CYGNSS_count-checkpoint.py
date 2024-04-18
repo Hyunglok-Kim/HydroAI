@@ -149,8 +149,8 @@ def main():
     print('Plotting Data....')
     # Optional: Plotting the results for visual confirmation
     plt.figure(figsize=(10, 6))
-    t = median_time_differences
-    im = plt.imshow(median_time_differences / 60 / 60, vmin=np.nanpercentile(t, 20), vmax=np.nanpercentile(t, 80), cmap='viridis')
+    t = median_time_differences / 60 / 60
+    im = plt.imshow(t, vmin=np.nanpercentile(t, 20), vmax=np.nanpercentile(t, 80), cmap='viridis')
     plt.colorbar(im)
     plt.title("Visualization of Data Count")
     plt.xlabel("Longitude Index")
