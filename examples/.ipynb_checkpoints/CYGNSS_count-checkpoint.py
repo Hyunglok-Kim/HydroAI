@@ -105,12 +105,14 @@ def main():
 
     num_processes = 150
     chunk_size = len(nc_file_list) // num_processes + (len(nc_file_list) % num_processes > 0)
-    
+
+    print('Calculating....')
     pool = Pool(processes=num_processes)
     results = pool.starmap(process_files, [(nc_file_list[i:i + chunk_size], ref_points, data_shape) for i in range(0, len(nc_file_list), chunk_size)])
     pool.close()
     pool.join()
-    
+
+    print('Aggregating Results....')
     # Aggregate results
     final_angle_sum = np.sum([result[0] for result in results], axis=0)
     final_angle_sum_sq = np.sum([result[1] for result in results], axis=0)
@@ -136,16 +138,17 @@ def main():
                 median_time_differences[r, c] = median_diff
             else:
                 median_time_differences[r, c] = None  # No data to process
-    
+
+    print('Saving Data....')
     # Save to CSV
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_angle_sum_{resol}.csv", final_angle_sum, delimiter=',')
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_angle_sum_sq_{resol}.csv", final_angle_sum_sq, delimiter=',')
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_data_count_{resol}.csv", final_data_count, delimiter=',')    
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_median_time_diff_{resol}.csv", median_time_differences, delimiter=',')    
-
+    
     # Optional: Plotting the results for visual confirmation
     plt.figure(figsize=(10, 6))
-    im = plt.imshow(median_time_differences, cmap='viridis')
+    im = plt.imshow(median_time_differences / 60 / 60, cmap='viridis')
     plt.colorbar(im)
     plt.title("Visualization of Data Count")
     plt.xlabel("Longitude Index")
