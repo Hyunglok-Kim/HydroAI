@@ -58,8 +58,8 @@ def process_files(file_names, ref_points, data_shape):
     local_data_count = np.zeros(data_shape, dtype=int)
 
     #timestamp_all_ddm = initialize_with_empty_lists(ref_lat.shape)
-    local_timestamp_all_update = initialize_with_empty_lists(ref_lat.shape)
-    local_timestamp_median = initialize_with_empty_lists(ref_lat.shape)
+    local_timestamp_all_update = initialize_with_empty_lists(data_shape.shape)
+    local_timestamp_median = initialize_with_empty_lists(data_shape.shape)
     tree = cKDTree(ref_points)
     
     for file_name in tqdm(file_names, desc="Processing Files", leave=False):
@@ -93,7 +93,8 @@ def process_files(file_names, ref_points, data_shape):
 def main():
     base_dir = cpuserver_data_FP+"/CYGNSS/L1_V21"
     nc_file_list = list_nc_files(base_dir)
-    resol = '3km'
+    nc_file_list = nc_file_list[:100]
+    resol = '36km'
     ref_lon, ref_lat = hGrid.generate_lon_lat_e2grid(resol)
     
     data_shape = ref_lat.shape
