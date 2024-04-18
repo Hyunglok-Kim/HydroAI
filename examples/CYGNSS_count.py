@@ -58,8 +58,8 @@ def process_files(file_names, ref_points, data_shape):
     local_data_count = np.zeros(data_shape, dtype=int)
 
     #timestamp_all_ddm = initialize_with_empty_lists(ref_lat.shape)
-    local_timestamp_all_update = initialize_with_empty_lists(data_shape.shape)
-    local_timestamp_median = initialize_with_empty_lists(data_shape.shape)
+    local_timestamp_all_update = initialize_with_empty_lists(data_shape)
+    local_timestamp_median = initialize_with_empty_lists(data_shape)
     tree = cKDTree(ref_points)
     
     for file_name in tqdm(file_names, desc="Processing Files", leave=False):
