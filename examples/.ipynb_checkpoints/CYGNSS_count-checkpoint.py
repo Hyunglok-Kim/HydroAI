@@ -145,10 +145,12 @@ def main():
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_angle_sum_sq_{resol}.csv", final_angle_sum_sq, delimiter=',')
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_data_count_{resol}.csv", final_data_count, delimiter=',')    
     np.savetxt(f"/data/CYGNSS/data_counts_csv/CYGNSS_median_time_diff_{resol}.csv", median_time_differences, delimiter=',')    
-    
+
+    print('Plotting Data....')
     # Optional: Plotting the results for visual confirmation
     plt.figure(figsize=(10, 6))
-    im = plt.imshow(median_time_differences / 60 / 60, cmap='viridis')
+    t = median_time_differences
+    im = plt.imshow(median_time_differences / 60 / 60, vmin=np.percentile(t, 20), vmax=np.percentile(t, 80), cmap='viridis')
     plt.colorbar(im)
     plt.title("Visualization of Data Count")
     plt.xlabel("Longitude Index")
