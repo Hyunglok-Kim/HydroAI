@@ -127,7 +127,7 @@ def main():
     median_time_differences = np.empty(data_shape, dtype=float)
     for r in range(final_timestamp_median.shape[0]):
         for c in range(final_timestamp_median.shape[1]):
-            if len(fianl_timestamp_median[r, c]) > 1:  # Ensure there are enough timestamps to calculate a difference
+            if len(final_timestamp_median[r, c]) > 1:  # Ensure there are enough timestamps to calculate a difference
                 final_timestamp_median[r, c].sort()  # Sort timestamps in place
                 
                 # Calculate differences and the average
