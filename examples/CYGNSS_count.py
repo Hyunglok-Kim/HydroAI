@@ -41,7 +41,7 @@ def cal_base_sec(time_units):
         original_base_date_str = match.group(1)
     
     original_base_datetime = datetime.strptime(original_base_date_str, '%Y-%m-%d %H:%M:%S.%f')
-    
+    new_base_datetime = datetime(2017, 1, 1)
     delta_seconds = (original_base_datetime - new_base_datetime).total_seconds()
     return delta_seconds
 
