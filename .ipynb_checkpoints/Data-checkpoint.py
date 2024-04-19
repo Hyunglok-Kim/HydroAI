@@ -11,6 +11,8 @@ from scipy.spatial import cKDTree
 import os
 import glob
 
+import matplotlib.pyplot as plt
+
 from pyhdf.SD import SD, SDC
 
 if platform.system() == 'Darwin':  # macOS
@@ -57,10 +59,32 @@ def load_data(input_fp, file_name, engine="c", clear_cache=False):
     
     return data, columns
 
-def mode_function(x):
-    return x.mode().iloc[0]
+#def mode_function(x):
+#    return x.mode().iloc[0]
 
-def Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+def mode_function(x):
+    mode_val = x.mode()
+    if not mode_val.empty:
+        return mode_val.iloc[0]
+    return np.nan
+
+def gini_simpson(values):
+    if values.empty or values.isna().all():
+        return np.nan
+    _, counts = np.unique(values.dropna(), return_counts=True)
+    probabilities = counts / counts.sum()
+    gini_simpson_index = 1 - np.sum(probabilities**2)
+    return gini_simpson_index
+
+def magnify_VAR(lon_input, lat_input, VAR, mag_factor):
+    # Rescale lon and lat using bilinear interpolation (order=1)
+    m_lon = zoom(lon_input, mag_factor, order=1)
+    m_lat = zoom(lat_input, mag_factor, order=1)
+    m_values = zoom(VAR, mag_factor, order=0)  # Nearest neighbor interpolation
+    print("After magnification (lat, lon, value shape):", m_lat.shape, m_lon.shape, m_values.shape)
+    return m_lon, m_lat, m_values
+
+def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
     #--------------------------BEGIN NOTE------------------------------%
     # University of Virginia
     # USDA
@@ -89,44 +113,47 @@ def Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_metho
     # 16 May 2023 Hyunglok Kim; converted to Python code
     # 17 Apr 2024 Hyunglok Kim; algorithm updated with cKDTree algorithm
     #-----------------------------------------------------------------%
+
+    s_target = lat_target.shape
+    s_input = lat_input.shape
+
+    if mag_factor > 1:
+        lon_input, lat_input, VAR = magnify_VAR(lon_input, lat_input, VAR, mag_factor)
+
+    # Flatten the coordinate arrays
+    coords_input = np.column_stack([lat_input.ravel(), lon_input.ravel()])
+    coords_target = np.column_stack([lat_target.ravel(), lon_target.ravel()])
+
+    # Build KDTree from target coordinates
+    tree = cKDTree(coords_target)
+
+    # Query KDTree to find the nearest target index for each input coordinate
+    distances, indices = tree.query(coords_input)
+
+    # Create a DataFrame for aggregation
+    df = pd.DataFrame({
+        'values': VAR.ravel(),
+        'indices': indices  # This maps each input value to its nearest target cell
+    })
+
+    # Aggregate the data
+    if agg_method == 'mode':
+        agg_values = df.groupby('indices')['values'].agg(lambda x: pd.Series.mode(x).iloc[0])
+    elif agg_method == 'count':
+        agg_values = df.groupby('indices')['values'].count()  # Correct usage of count
+    elif agg_method == 'gini_simpson':
+        agg_values = df.groupby('indices')['values'].agg(gini_simpson)  # Using the custom function
+    else:
+        agg_values = df.groupby('indices')['values'].agg(agg_method)
+
+    # Prepare the result array
+    VAR_r = np.full(lat_target.shape, np.nan)
+    for idx, value in agg_values.items():
+        np.put(VAR_r, idx, value)  # Assign aggregated values to their corresponding indices in the result array
+
+    return VAR_r
     
-    def magnify_VAR(lat_input, lon_input, VAR, mag_factor):
-        # Rescale lon and lat using bilinear interpolation (order=1)
-        m_lon = zoom(lon_input, mag_factor, order=1)
-        m_lat = zoom(lat_input, mag_factor, order=1)
-        m_values = zoom(VAR, mag_factor, order=0)  # Nearest neighbor interpolation
-        return m_lat, m_lon, m_values
-    
-    # Check if magnification is needed
-    if lat_target.shape > lat_input.shape:
-        lat_input, lon_input, VAR = magnify_VAR(lat_input, lon_input, VAR, mag_factor)
-
-    # Flatten the target and input coordinates
-    target_coords = np.column_stack([lat_target.ravel(), lon_target.ravel()])
-    input_coords = np.column_stack([lat_input.ravel(), lon_input.ravel()])
-
-    # Create a KDTree for fast nearest-neighbor lookup
-    tree = cKDTree(input_coords)
-
-    # Find the nearest neighbors in the input data for each target location
-    distances, indices = tree.query(target_coords, k=1)  # k=1 for nearest neighbor
-
-    # Using the indices to map input data to target data grid
-    resampled_VAR = VAR.ravel()[indices].reshape(lat_target.shape)
-
-    # Handling aggregation if necessary
-    if agg_method != 'mean':  # 'mean' is handled by default above
-        # Example: Handling other aggregation methods
-        df = pd.DataFrame({'values': resampled_VAR.ravel(), 'indices': indices})
-        if agg_method == 'max':
-            resampled_VAR = df.groupby('indices')['values'].max().values.reshape(lat_target.shape)
-        elif agg_method == 'min':
-            resampled_VAR = df.groupby('indices')['values'].min().values.reshape(lat_target.shape)
-        # Implement other aggregations as needed
-
-    return resampled_VAR
-    
-def Resampling_old(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
+def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
     #--------------------------BEGIN NOTE------------------------------%
     # University of Virginia
     # USDA
@@ -153,22 +180,17 @@ def Resampling_old(lat_target, lon_target, lat_input, lon_input, VAR, sampling_m
     # REVISION HISTORY: 
     # 2 Jul 2020 Hyunglok Kim; initial specification in Matlab
     # 16 May 2023 Hyunglok Kim; converted to Python code
+    # 19 Apr 2024 Hyunglok Kim; Gini-simpson index added
     #-----------------------------------------------------------------%
-    def magnify_VAR(lat_input, lon_input, VAR, mag_factor):
-        # Rescale lon and lat using bilinear interpolation (order=1)
-        m_lon = zoom(lon_input, [mag_factor, mag_factor], order=1)
-        m_lat = zoom(lat_input, [mag_factor, mag_factor], order=1) 
-        # order=0, the zoom function performs nearest-neighbor interpolation
-        m_values = zoom(VAR, [mag_factor, mag_factor], order=0)
-        return m_lat, m_lon, m_values
     
     s_target = lat_target.shape
     s_input  = lat_input.shape
     
-    if s_target[0] > s_input[0] or s_target[1] > s_input[1]:
-        lat_input, lon_input, VAR = magnify_VAR(lat_input, lon_input, VAR, mag_factor)
+    #if s_target[0] > s_input[0] or s_target[1] > s_input[1]:
+    if mag_factor > 1:
+        lon_input, lat_input, VAR = magnify_VAR(lon_input, lat_input, VAR, mag_factor)
 
-    def resample_agg(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method):
+    def resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method):
         nan_frame = np.empty(lat_target.shape)
         nan_frame[:] = np.nan
         VAR_r = nan_frame
@@ -191,10 +213,14 @@ def Resampling_old(lat_target, lon_target, lat_input, lon_input, VAR, sampling_m
         nan_valid = np.isnan(np.sum([t_lat_index, t_lon_index], axis=0))
         valid_value = valid_value[~nan_valid]
         df = pd.DataFrame({'idx': index_array[~nan_valid], 'val': valid_value})
-        
+
+        # Aggregate the data       
         if agg_method == 'mode':
-            agg_method = mode_function
-            agg_values = df.groupby('idx')['val'].apply(agg_method)
+            agg_values = df.groupby('idx')['val'].apply(lambda x: pd.Series.mode(x).iloc[0])
+        elif agg_method == 'count':
+            agg_values = df.groupby('idx')['val'].count()  # Correct usage of count
+        elif agg_method == 'gini_simpson':
+            agg_values = df.groupby('idx')['val'].agg(gini_simpson)  # Using the custom function
         else:
             agg_values = getattr(df.groupby('idx')['val'], agg_method)()
             
@@ -206,7 +232,7 @@ def Resampling_old(lat_target, lon_target, lat_input, lon_input, VAR, sampling_m
         print('Resampling is not required.')
         VAR_r = VAR
     else:
-        VAR_r = resample_agg(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method)
+        VAR_r = resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method)
     return VAR_r
 
 def process_var(i, lat_target, lon_target, lat_input, lon_input, data, sampling_method,agg_method, mag_factor):
