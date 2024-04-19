@@ -127,7 +127,8 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     - fig, ax: Figure and axes objects of the plot.
     """
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
-    fig.suptitle(plot_title, fontsize=16, y=0.67)
+    #fig.suptitle(plot_title, fontsize=16, y=0.67)
+    fig.suptitle(plot_title, fontsize=16, y=0.69)
     
     # Calculate the extent from the longitude and latitude
     extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
@@ -427,8 +428,8 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     # Create the plot
-    ax.suptitle(title, fontsize=16, y=0.67)
-    fig.suptitle(plot_title, fontsize=16, y=0.67)
+    #ax.suptitle(title, fontsize=16, y=0.67)
+    fig.suptitle(title, fontsize=16, y=0.72)
     
     # Set geographic bounds if specified
     if bounds:
