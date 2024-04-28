@@ -235,29 +235,29 @@ def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_metho
         VAR_r = resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method)
     return VAR_r
 
-def process_var(i, lat_target, lon_target, lat_input, lon_input, data, sampling_method,agg_method, mag_factor):
+def process_var(i, lon_target, lat_target, lon_input, lat_input, data, sampling_method,agg_method, mag_factor):
     #print(i)
     VAR = data[:,:,i]
-    result = Resampling(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method, agg_method, mag_factor)
+    result = Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method, mag_factor)
     return result
 
-def Resampling_forloop(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=3):
+def Resampling_forloop(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=3):
     
     m, n = lat_target.shape  # Get the dimensions from lat_target
     # Initialize results array
     results = np.empty((m, n, VAR.shape[2]))
     
     for i in tqdm(range(0, VAR.shape[2])):
-        t = Resampling(lat_target, lon_target, lat_input, lon_input, VAR[:,:,i],'nearest')
+        t = Resampling(lon_target, lat_target, lon_input, lat_input, VAR[:,:,i],'nearest')
         results[:,:,i] = t
 
     return results
 
-def Resampling_parallel(lat_target, lon_target, lat_input, lon_input, VAR, sampling_method='nearest',agg_method='mean', mag_factor=3):
+def Resampling_parallel(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method='nearest',agg_method='mean', mag_factor=3):
 
     # Create a partial function with the arguments that don't change
-    partial_process_var = partial(process_var, lat_target=lat_target, lon_target=lon_target,
-                                  lat_input=lat_input, lon_input=lon_input, data=VAR, sampling_method=sampling_method, agg_method=agg_method, mag_factor=mag_factor)
+    partial_process_var = partial(process_var, lon_target=lon_target, lat_target=lat_target,
+                                  lon_input=lon_input, lat_input=lat_input, data=VAR, sampling_method=sampling_method, agg_method=agg_method, mag_factor=mag_factor)
     m, n = lat_target.shape  # Get the dimensions from lat_target
 
     # Initialize results array
