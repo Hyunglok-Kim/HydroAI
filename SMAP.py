@@ -71,10 +71,10 @@ def get_e2grid(cpuserver_data_FP, mission_product):
         tuple: Two arrays containing the longitude and latitude values of the grid.
     """
 
-    if mission_product.startswith('SPL3SMP.'):
+    if (mission_product.startswith('SPL3SMP.')) or (mission_product.startswith('36km')):
         grid_prefix = 'EASE2_M36km'
         shape = (964, 406)
-    elif mission_product.startswith('SPL3SMP_E.'):
+    elif (mission_product.startswith('SPL3SMP_E.')) or (mission_product.startswith('9km')):
         grid_prefix = 'EASE2_M09km'
         shape = (3856, 1624)
     elif mission_product.startswith('25km'):
@@ -164,50 +164,3 @@ def create_array_from_h5(file_list, data_doy, year, cpuserver_data_FP, mission_p
     longitude, latitude = get_e2grid(cpuserver_data_FP, mission_product)
     
     return data_array, longitude, latitude
-
-def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
-    """
-    Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
-
-    Args:
-        nc_file (str): Path to the output NetCDF file.
-        latitude (np.array): 2D array of latitude values.
-        longitude (np.array): 2D array of longitude values.
-        data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
-
-    Returns:
-        None
-    """
-    # Create a new NetCDF file
-    nc_data = netCDF4.Dataset(nc_file, 'w')
-
-    # Define the dimensions
-    rows, cols = latitude.shape
-    # Assuming all data variables have the same 'time' dimension size
-    doy = next(iter(data_vars.values())).shape[2]
-
-    # Create dimensions in the NetCDF file
-    nc_data.createDimension('latitude', rows)
-    nc_data.createDimension('longitude', cols)
-    nc_data.createDimension('doy', doy)
-
-    # Create latitude and longitude variables
-    lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
-    lon_var = nc_data.createVariable('longitude', 'f4', ('latitude', 'longitude'))
-
-    # Assign data to the latitude and longitude variables
-    lat_var[:] = latitude
-    lon_var[:] = longitude
-
-    # Create variables and assign data for each item in data_vars
-    for var_name, var_data in data_vars.items():
-        # Create variable in NetCDF file
-        nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
-        # Assign data to the variable
-        nc_var[:] = var_data
-
-    # Close the NetCDF file
-    nc_data.close()
-
-    print(f"NetCDF file {nc_file} created successfully.")
-
