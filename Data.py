@@ -83,7 +83,7 @@ def magnify_VAR(lon_input, lat_input, VAR, mag_factor):
     m_lon = zoom(lon_input, mag_factor, order=1)
     m_lat = zoom(lat_input, mag_factor, order=1)
     m_values = zoom(VAR, mag_factor, order=0)  # Nearest neighbor interpolation
-    print("After magnification (lat, lon, value shape):", m_lat.shape, m_lon.shape, m_values.shape)
+    #print("After magnification (lat, lon, value shape):", m_lat.shape, m_lon.shape, m_values.shape)
     return m_lon, m_lat, m_values
 
 def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
