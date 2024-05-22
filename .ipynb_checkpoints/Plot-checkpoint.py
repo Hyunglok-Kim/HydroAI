@@ -128,8 +128,11 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     """
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     #fig.suptitle(plot_title, fontsize=16, y=0.67)
-    fig.suptitle(plot_title, fontsize=16, y=0.69)
-    
+    #fig.suptitle(plot_title, fontsize=16, y=0.69)
+    fig.suptitle(plot_title, fontsize=16, y=0.64)
+    #plt.tight_layout(rect=[0,0,1,0.95])
+    plt.subplots_adjust(top=0.64)
+
     # Calculate the extent from the longitude and latitude
     extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
     
@@ -160,7 +163,7 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     gl.xlabel_style = {'size': 15, 'color': 'black'}
     gl.ylabel_style = {'size': 15, 'color': 'black'}
 
-    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.02, shrink=0.5)
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
     cbar.set_label(label_title)
     im.set_clim(cmin, cmax)
 

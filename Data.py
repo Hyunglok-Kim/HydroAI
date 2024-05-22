@@ -11,6 +11,8 @@ from scipy.spatial import cKDTree
 import os
 import glob
 
+import netCDF4
+
 import matplotlib.pyplot as plt
 
 from pyhdf.SD import SD, SDC
@@ -84,7 +86,7 @@ def magnify_VAR(lon_input, lat_input, VAR, mag_factor):
     print("After magnification (lat, lon, value shape):", m_lat.shape, m_lon.shape, m_values.shape)
     return m_lon, m_lat, m_values
 
-def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
+def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
     #--------------------------BEGIN NOTE------------------------------%
     # University of Virginia
     # USDA
@@ -248,7 +250,7 @@ def Resampling_forloop(lon_target, lat_target, lon_input, lat_input, VAR, sampli
     results = np.empty((m, n, VAR.shape[2]))
     
     for i in tqdm(range(0, VAR.shape[2])):
-        t = Resampling(lon_target, lat_target, lon_input, lat_input, VAR[:,:,i],'nearest')
+        t = Resampling(lon_target, lat_target, lon_input, lat_input, VAR[:,:,i],sampling_method, agg_method, mag_factor)
         results[:,:,i] = t
 
     return results
@@ -386,6 +388,61 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 # all_txt_files = get_file_list(directory, file_ext)
 # Get text files that include "abs", "2021", or "report" in the filename
 # filtered_txt_files = get_file_list(directory, file_ext, filter_strs=["abs", "2021", "report"])
+
+### netcdf modules ###
+def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
+    """
+    Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
+
+    Args:
+        nc_file (str): Path to the output NetCDF file.
+        latitude (np.array): 2D array of latitude values.
+        longitude (np.array): 2D array of longitude values.
+        data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
+
+    Returns:
+        None
+    """
+    # Create a new NetCDF file
+    nc_data = netCDF4.Dataset(nc_file, 'w')
+
+    # Define the dimensions
+    rows, cols = latitude.shape
+    # Assuming all data variables have the same 'time' dimension size
+    doy = next(iter(data_vars.values())).shape[2]
+
+    # Create dimensions in the NetCDF file
+    nc_data.createDimension('latitude', rows)
+    nc_data.createDimension('longitude', cols)
+    nc_data.createDimension('doy', doy)
+
+    # Create latitude and longitude variables
+    lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
+    lon_var = nc_data.createVariable('longitude', 'f4', ('latitude', 'longitude'))
+
+    # Assign data to the latitude and longitude variables
+    lat_var[:] = latitude
+    lon_var[:] = longitude
+
+    # Create variables and assign data for each item in data_vars
+    for var_name, var_data in data_vars.items():
+        # Create variable in NetCDF file
+        nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
+        # Assign data to the variable
+        nc_var[:] = var_data
+
+    # Close the NetCDF file
+    nc_data.close()
+
+    print(f"NetCDF file {nc_file} created successfully.")
+
+# Example usage
+#hData.create_netcdf_file(
+#        nc_file    = nc_file_name,
+#        latitude   = domain_lat,
+#        longitude  = domain_lon,
+#        Resampled_SMOS_SM    = Resampled_SMOS_SM,
+#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC)
 
 ### h4 modules ###
 def inspect_hdf4_file(input_file):
