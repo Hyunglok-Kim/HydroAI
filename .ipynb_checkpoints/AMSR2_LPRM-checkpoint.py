@@ -1,5 +1,5 @@
 """
-SMOS_IC.py: A module for processing SMOS(Soil Moisture Ocean Salinity) satellite IC algorithm soil moisture data
+SMAP.py: A module for processing GCOM-W1 satellite AMSR2 LPRM-based soil moisture data.
 
 This module contains functions for extracting file lists based on the day of the year (DOY), 
 generating latitude and longitude grids, creating arrays from .h5 files, and creating NetCDF files 
@@ -39,7 +39,7 @@ def extract_filelist_doy(directory, year):
             # Process only if the year matches the specified year
             if date_obj.year == year:
                 # Search for .nc files within the subdirectory
-                nc_files = glob.glob(os.path.join(sub_dir_path, '*.nc'))
+                nc_files = glob.glob(os.path.join(sub_dir_path, '*.nc4'))
 
                 # Get the day of the year (DOY) number
                 doy = date_obj.timetuple().tm_yday
@@ -55,6 +55,11 @@ def extract_filelist_doy(directory, year):
     file_list, data_doy = zip(*data) if data else ([], [])
 
     return file_list, data_doy
+
+def correct_shape(data):
+    data = np.fliplr(data.transpose((1, 0, 2)))
+
+    return data
 
 def create_array_from_nc(file_list, data_doy, year, variable_name):
     # Read data from the first NC file

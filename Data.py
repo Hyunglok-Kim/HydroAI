@@ -183,59 +183,59 @@ def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_metho
     # 2 Jul 2020 Hyunglok Kim; initial specification in Matlab
     # 16 May 2023 Hyunglok Kim; converted to Python code
     # 19 Apr 2024 Hyunglok Kim; Gini-simpson index added
+    # 23 May 2024 Hyunglok Kim; Resampling condition added
     #-----------------------------------------------------------------%
     
-    s_target = lat_target.shape
-    s_input  = lat_input.shape
-    
-    #if s_target[0] > s_input[0] or s_target[1] > s_input[1]:
-    if mag_factor > 1:
-        lon_input, lat_input, VAR = magnify_VAR(lon_input, lat_input, VAR, mag_factor)
-
-    def resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method):
-        nan_frame = np.empty(lat_target.shape)
-        nan_frame[:] = np.nan
-        VAR_r = nan_frame
-
-        valid_data = (~np.isnan(VAR)) & (lat_input <= np.max(lat_target[:,0])) & \
-                     (lat_input > np.min(lat_target[:,0])) & (lon_input < np.max(lon_target[0,:])) & \
-                     (lon_input >= np.min(lon_target[0,:]))
-
-        valid_value = VAR[valid_data]
-        t_lat = lat_input[valid_data]
-        t_lon = lon_input[valid_data]
-
-        f_lat = interp1d(lat_target[:,0], np.arange(lat_target.shape[0]), kind=sampling_method, bounds_error=False)
-        f_lon = interp1d(lon_target[0,:], np.arange(lon_target.shape[1]), kind=sampling_method, bounds_error=False)
-
-        t_lat_index = f_lat(t_lat)
-        t_lon_index = f_lon(t_lon)
-
-        index_array = np.ravel_multi_index([t_lat_index.astype(int), t_lon_index.astype(int)], lat_target.shape)
-        nan_valid = np.isnan(np.sum([t_lat_index, t_lon_index], axis=0))
-        valid_value = valid_value[~nan_valid]
-        df = pd.DataFrame({'idx': index_array[~nan_valid], 'val': valid_value})
-
-        # Aggregate the data       
-        if agg_method == 'mode':
-            agg_values = df.groupby('idx')['val'].apply(lambda x: pd.Series.mode(x).iloc[0])
-        elif agg_method == 'count':
-            agg_values = df.groupby('idx')['val'].count()  # Correct usage of count
-        elif agg_method == 'gini_simpson':
-            agg_values = df.groupby('idx')['val'].agg(gini_simpson)  # Using the custom function
-        else:
-            agg_values = getattr(df.groupby('idx')['val'], agg_method)()
-            
-        VAR_r[np.unravel_index(agg_values.index.values, VAR_r.shape)] = agg_values.values
-
-        return VAR_r
-
-    if lat_target.shape == lat_input.shape and np.all(lat_target == lat_input) and np.all(lon_target == lon_input):
-        print('Resampling is not required.')
-        VAR_r = VAR
+    if np.array_equal(lon_target, lon_input): # do not resample it if a target and input data are the equal projection/resolution
+       return VAR
     else:
-        VAR_r = resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method)
-    return VAR_r
+        if mag_factor > 1:
+            lon_input, lat_input, VAR = magnify_VAR(lon_input, lat_input, VAR, mag_factor)
+    
+        def resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method):
+            nan_frame = np.empty(lat_target.shape)
+            nan_frame[:] = np.nan
+            VAR_r = nan_frame
+    
+            valid_data = (~np.isnan(VAR)) & (lat_input <= np.max(lat_target[:,0])) & \
+                         (lat_input > np.min(lat_target[:,0])) & (lon_input < np.max(lon_target[0,:])) & \
+                         (lon_input >= np.min(lon_target[0,:]))
+    
+            valid_value = VAR[valid_data]
+            t_lat = lat_input[valid_data]
+            t_lon = lon_input[valid_data]
+    
+            f_lat = interp1d(lat_target[:,0], np.arange(lat_target.shape[0]), kind=sampling_method, bounds_error=False)
+            f_lon = interp1d(lon_target[0,:], np.arange(lon_target.shape[1]), kind=sampling_method, bounds_error=False)
+    
+            t_lat_index = f_lat(t_lat)
+            t_lon_index = f_lon(t_lon)
+    
+            index_array = np.ravel_multi_index([t_lat_index.astype(int), t_lon_index.astype(int)], lat_target.shape)
+            nan_valid = np.isnan(np.sum([t_lat_index, t_lon_index], axis=0))
+            valid_value = valid_value[~nan_valid]
+            df = pd.DataFrame({'idx': index_array[~nan_valid], 'val': valid_value})
+    
+            # Aggregate the data       
+            if agg_method == 'mode':
+                agg_values = df.groupby('idx')['val'].apply(lambda x: pd.Series.mode(x).iloc[0])
+            elif agg_method == 'count':
+                agg_values = df.groupby('idx')['val'].count()  # Correct usage of count
+            elif agg_method == 'gini_simpson':
+                agg_values = df.groupby('idx')['val'].agg(gini_simpson)  # Using the custom function
+            else:
+                agg_values = getattr(df.groupby('idx')['val'], agg_method)()
+                
+            VAR_r[np.unravel_index(agg_values.index.values, VAR_r.shape)] = agg_values.values
+    
+            return VAR_r
+    
+        if lat_target.shape == lat_input.shape and np.all(lat_target == lat_input) and np.all(lon_target == lon_input):
+            print('Resampling is not required.')
+            VAR_r = VAR
+        else:
+            VAR_r = resample_agg(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method)
+        return VAR_r
 
 def process_var(i, lon_target, lat_target, lon_input, lat_input, data, sampling_method,agg_method, mag_factor):
     #print(i)

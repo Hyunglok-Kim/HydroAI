@@ -1,5 +1,5 @@
 """
-SMAP.py: A module for processing SMAP (Soil Moisture Active Passive) satellite data.
+SMOS_IC.py: A module for processing SMOS(Soil Moisture Ocean Salinity) satellite IC algorithm soil moisture data
 
 This module contains functions for extracting file lists based on the day of the year (DOY), 
 generating latitude and longitude grids, creating arrays from .h5 files, and creating NetCDF files 
