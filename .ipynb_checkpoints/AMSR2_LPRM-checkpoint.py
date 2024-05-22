@@ -61,6 +61,28 @@ def correct_shape(data):
 
     return data
 
+# bit meaning
+# 1 Negative optical depth in X
+# 2 Negative optical depth in C2
+# 3 Negative optical depth in C1
+# 4 High optical depth value in X
+# 5 High optical depth value in C2
+# 6 High optical depth value in C1
+# 7 No valid data
+# 8 Ice
+# 9 Not processed
+def create_mask(bit_mask_3d, bit_position=8):
+    # Ensure the bit mask is in an integer format
+    bit_mask_3d = bit_mask_3d.astype(np.int32)
+    
+    # Identify where bit 8 (Ice) is set
+    ice_mask = (bit_mask_3d & (1 << bit_position)) != 0
+
+    # Convert boolean mask to integer mask (1 for ice, 0 for no ice)
+    ice_mask = ice_mask.astype(int)
+
+    return ice_mask
+
 def create_array_from_nc(file_list, data_doy, year, variable_name):
     # Read data from the first NC file
     nc_data = netCDF4.Dataset(file_list[0])
