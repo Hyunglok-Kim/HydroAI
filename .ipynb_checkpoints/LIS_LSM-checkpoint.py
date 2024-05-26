@@ -32,6 +32,7 @@ def get_nc_file_paths(base_dir, contain='_HIST_'):
 #print(f"Found {len(nc_paths)} .nc files.")
 
 def get_nc_variable_names_units(nc_file_path):
+    print('This function will be deprecated. Use HydroAI Dataset.get_nc_variable_names_units instead')
     """
     Get a list of variable names and a corresponding list of their units from a NetCDF file.
 
@@ -62,10 +63,8 @@ def get_nc_variable_names_units(nc_file_path):
 #variables = get_nc_variable_list(nc_file)
 #print("Variables in the NC file:", variables)
 
-from netCDF4 import Dataset
-import numpy as np
-
-def get_variable_from_nc(nc_file_path, variable_name, layer_index=0):
+def get_variable_from_nc(nc_file_path, variable_name, layer_index=0, flip_data=True):
+    print('This function will be deprecated. Use HydroAI Dataset.get_variable_from_nc instead')
     """
     Extract a specific layer (if 3D), the entire array (if 2D or 1D), or the value (if 0D) of a variable
     from a NetCDF file and return it as a NumPy array, with fill values replaced by np.nan.
@@ -84,9 +83,21 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0):
             variable.set_auto_maskandscale(True)
 
             # Extract data based on the number of dimensions
-            if variable.ndim == 3:
+            if variable.ndim == 4:
                 # Extract the specified layer for 3D variables
-                data = variable[layer_index, :, :]
+                #it is very likely some ERA5 data
+                if layer_index == 'all':
+                    data = variable[:,0,:,:]
+                else:
+                    data = variable[layer_index,0,:,:]
+            
+            elif variable.ndim == 3:
+                # Extract the specified layer for 3D variables
+                if layer_index == 'all':
+                    data = variable
+                else:
+                    data = variable[layer_index,:,:]
+                
             elif variable.ndim == 2:
                 # Extract all data for 2D variables
                 data = variable[:, :]
@@ -104,8 +115,9 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0):
                 data = data.filled(np.nan)
             
             # Flip the data upside down if it's 2D or 3D (common in geographical data to match orientation)
-            if variable.ndim in [2, 3]:
-                data = np.flipud(data)
+            if flip_data:
+                if variable.ndim in [2, 3]:
+                    data = np.flipud(data)
 
             return data
         else:

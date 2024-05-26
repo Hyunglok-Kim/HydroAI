@@ -130,19 +130,22 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     #fig.suptitle(plot_title, fontsize=16, y=0.67)
     #fig.suptitle(plot_title, fontsize=16, y=0.69)
-    fig.suptitle(plot_title, fontsize=16, y=0.64)
+    fig.suptitle(plot_title, fontsize=16)
     #plt.tight_layout(rect=[0,0,1,0.95])
-    plt.subplots_adjust(top=0.64)
-
+    #plt.subplots_adjust(top=0.64)
+    plt.tight_layout(rect=[0, 0, 1, 0.99])
+    
     # Calculate the extent from the longitude and latitude
-    extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
     
     # Set map extent if bounds are provided, else use the calculated extent
     if bounds:
         ax.set_extent(bounds, crs=ccrs.PlateCarree())
-    else:
+    elif bounds == 'global':
         ax.set_global()
-
+    else:
+        extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
+        ax.set_extent(extent, crs=ccrs.PlateCarree())
+    
     # Plot DEM as background if provided
     if dem_path:
         with rasterio.open(dem_path) as dem:
