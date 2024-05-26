@@ -20,7 +20,7 @@ from tqdm import tqdm
 from PIL import Image
 import rioxarray
 
-from HydroAI.LIS_LSM import get_variable_from_nc
+from HydroAI.Data import get_variable_from_nc
 from HydroAI.Data import Resampling
 import HydroAI.Data as Data
 
