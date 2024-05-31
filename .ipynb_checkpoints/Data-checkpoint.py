@@ -275,23 +275,66 @@ def Resampling_parallel(lon_target, lat_target, lon_input, lat_input, VAR, sampl
 
     return results
 
-def moving_average_3d(data, window_size):
+def moving_average_3d(data, window_size, mode='+-', min_valid_fraction=0.3):
     m, n, z = data.shape
-    padding = window_size // 2  # Number of elements to pad on each side
+    
+    if mode == 'past':
+        padding = (window_size - 1, 0)  # Pad only on the left
+    elif mode == 'post':
+        padding = (0, window_size - 1)  # Pad only on the right
+    elif mode == '+-':
+        padding = (window_size, window_size)  # Pad on both sides
+    else:
+        raise ValueError("Mode should be 'past', 'post', or '+-'")
     
     # Pad the data with NaN values to handle the edges
-    padded_data = np.pad(data, ((0, 0), (0, 0), (padding, padding)), mode='constant', constant_values=np.nan)
+    padded_data = np.pad(data, ((0, 0), (0, 0), padding), mode='constant', constant_values=np.nan)
     
     # Create an array to store the moving averaged values
-    moving_averaged = np.zeros((m, n, z))
+    moving_averaged = np.full((m, n, z), np.nan)  # Initialize with NaNs
+    
+    # Minimum number of valid points required
+    min_valid_points = int(window_size * min_valid_fraction)
     
     # Calculate the moving average for each row and pixel
-    # This code can be modified not to average already "moving averaged" values
-    # This code can be modified not to average if there is less than certain numbers of valid points
-    for k in range(z):
-        moving_averaged[:, :, k] = np.nanmean(padded_data[:, :, k:k+window_size], axis=2)
+    for k in tqdm(range(z), desc="Calculating moving average"):
+        if mode == 'past':
+            if k < window_size:
+                window_data = padded_data[:, :, :k+1]
+            else:
+                window_data = padded_data[:, :, k-window_size+1:k+1]
+        elif mode == 'post':
+            window_data = padded_data[:, :, k:k+window_size]
+        elif mode == '+-':
+            start = k - window_size
+            end = k + window_size + 1
+            window_data = padded_data[:, :, start:end]
+        
+        valid_counts = np.sum(~np.isnan(window_data), axis=2)
+        
+        with np.errstate(invalid='ignore'):  # Ignore warnings due to NaNs
+            moving_averaged[:, :, k] = np.where(valid_counts >= min_valid_points, np.nanmean(window_data, axis=2), np.nan)
     
     return moving_averaged
+
+
+#def moving_average_3d(data, window_size):
+#    m, n, z = data.shape
+#    padding = window_size // 2  # Number of elements to pad on each side
+#    
+#    # Pad the data with NaN values to handle the edges
+#    padded_data = np.pad(data, ((0, 0), (0, 0), (padding, padding)), mode='constant', constant_values=np.nan)
+#    
+#    # Create an array to store the moving averaged values
+#    moving_averaged = np.zeros((m, n, z))
+#    
+#    # Calculate the moving average for each row and pixel
+#    # This code can be modified not to average already "moving averaged" values
+#    # This code can be modified not to average if there is less than certain numbers of valid points
+#    for k in range(z):
+#        moving_averaged[:, :, k] = np.nanmean(padded_data[:, :, k:k+window_size], axis=2)
+#    
+#    return moving_averaged
 
 def find_closest_index(longitudes, latitudes, point):
     lon_lat = np.c_[longitudes.ravel(), latitudes.ravel()]
@@ -502,26 +545,20 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0, flip_data=T
         # Check if the variable exists in the NetCDF file
         if variable_name in nc.variables:
             variable = nc.variables[variable_name]
-            
-            # Set auto mask and scale to True to automatically convert fill values to NaN
-            variable.set_auto_maskandscale(True)
 
             # Extract data based on the number of dimensions
             if variable.ndim == 4:
                 # Extract the specified layer for 3D variables
-                # It is very likely some ERA5 data (time, x, lat, lon)
                 if layer_index == 'all':
-                    data = variable[:,0,:,:]
+                    data = variable[:, 0, :, :]
                 else:
-                    data = variable[layer_index,0,:,:]
-            
+                    data = variable[layer_index, 0, :, :]
             elif variable.ndim == 3:
                 # Extract the specified layer for 3D variables
                 if layer_index == 'all':
-                    data = variable
+                    data = variable[:, :, :]
                 else:
-                    data = variable[layer_index,:,:]
-                
+                    data = variable[layer_index, :, :]
             elif variable.ndim == 2:
                 # Extract all data for 2D variables
                 data = variable[:, :]
@@ -530,23 +567,24 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0, flip_data=T
                 data = variable[:]
             elif variable.ndim == 0:
                 # Extract scalar value for 0D variables
-                data = variable.scalar()
+                data = variable.getValue()
             else:
                 raise ValueError(f"Variable '{variable_name}' has unsupported number of dimensions: {variable.ndim}.")
 
             # Handle fill values (mask to NaN if necessary)
             if isinstance(data, np.ma.MaskedArray):
-                data = data.filled(np.nan)
+                fill_value = np.nan if np.issubdtype(data.dtype, np.floating) else -9999
+                data = data.filled(fill_value)
+                data = np.where(data == -9999, np.nan, data)  # Replace fill_value with NaN for integer arrays
             
             # Flip the data upside down if it's 2D or 3D (common in geographical data to match orientation)
-            if flip_data:
-                if variable.ndim in [2, 3]:
-                    data = np.flipud(data)
+            if flip_data and variable.ndim in [2, 3]:
+                data = np.flipud(data)
 
             return data
         else:
             raise ValueError(f"Variable '{variable_name}' does not exist in the NetCDF file.")
-    
+
 ### h4 modules ###
 def inspect_hdf4_file(input_file):
     """

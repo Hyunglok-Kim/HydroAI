@@ -130,10 +130,10 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     #fig.suptitle(plot_title, fontsize=16, y=0.67)
     #fig.suptitle(plot_title, fontsize=16, y=0.69)
-    fig.suptitle(plot_title, fontsize=16)
+    #fig.suptitle(plot_title, fontsize=16)
     #plt.tight_layout(rect=[0,0,1,0.95])
     #plt.subplots_adjust(top=0.64)
-    plt.tight_layout(rect=[0, 0, 1, 0.99])
+    #plt.tight_layout(rect=[0, 0, 1, 0.99])
     
     # Calculate the extent from the longitude and latitude
     
