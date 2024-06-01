@@ -336,12 +336,52 @@ def moving_average_3d(data, window_size, mode='+-', min_valid_fraction=0.3):
 #    
 #    return moving_averaged
 
-def find_closest_index(longitudes, latitudes, point):
+def find_closest_index_old(longitudes, latitudes, point):
     lon_lat = np.c_[longitudes.ravel(), latitudes.ravel()]
     tree = cKDTree(lon_lat)
     dist, idx = tree.query(point, k=1)
     return np.unravel_index(idx, latitudes.shape)
 
+def is_uniform(array, axis):
+    """
+    Check if all rows or columns in the array are the same.
+
+    Parameters:
+    array (np.ndarray): Input array.
+    axis (int): Axis to check for uniformity. 0 for columns, 1 for rows.
+
+    Returns:
+    np.ndarray: Boolean array indicating uniformity along the specified axis.
+    """
+    if axis == 1:  # Check row-wise
+        return np.all(array == array[0, :][None, :], axis=1)
+    elif axis == 0:  # Check column-wise
+        return np.all(array == array[:, 0][:, None], axis=0)
+    else:
+        raise ValueError("Axis must be 0 (columns) or 1 (rows).")
+        
+def find_closest_index(lon_2d, lat_2d, coord):
+    lon_value, lat_value = coord
+
+    if np.all(is_uniform(lon_2d,1)) and np.all(is_uniform(lat_2d,0)):
+        # Case when lon_2d's rows are uniform and lat_2d's columns are uniform
+        lon_unique = lon_2d[0, :]
+        lat_unique = lat_2d[:, 0]
+        lon_idx = (np.abs(lon_unique - lon_value)).argmin()
+        lat_idx = (np.abs(lat_unique - lat_value)).argmin()
+    else:
+        # Case when lon_2d and lat_2d are not uniform
+        lon_flat = lon_2d.flatten()
+        lat_flat = lat_2d.flatten()
+        
+        coordinates = np.vstack((lon_flat, lat_flat)).T
+        tree = cKDTree(coordinates)
+        
+        dist, idx = tree.query(coord)
+        lat_idx, lon_idx = np.unravel_index(idx, lon_2d.shape)
+    
+    return lat_idx, lon_idx
+    
 def extract_region_from_data(longitude, latitude, X, bounds):
     """
     Create a subset of a 3D array based on given latitude and longitude bounds.
