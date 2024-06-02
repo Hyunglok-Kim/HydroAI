@@ -8,6 +8,7 @@ from scipy.ndimage import zoom
 from functools import partial
 from tqdm import tqdm
 from scipy.spatial import cKDTree
+from datetime import datetime, timedelta
 import os
 import glob
 
@@ -31,6 +32,61 @@ else:  # assume Linux or other Unix-like system
 #    print("Cache cleared")
 #atexit.register(clear_cache)
 
+def create_3d_object_array(x, y, z):
+    """
+    Create a 3D NumPy array that can store list data, with the specified shape (x, y, z).
+    
+    Parameters:
+    x (int): Size of the first dimension.
+    y (int): Size of the second dimension.
+    z (int): Size of the third dimension.
+    
+    Returns:
+    np.ndarray: 3D NumPy array of shape (x, y, z) with dtype=object.
+    """
+    # Create an empty array with the given shape and dtype=object
+    if z == 0:
+        obj_array = np.empty((x, y), dtype=object)
+        # Initialize each element to an empty list
+        for i in range(x):
+            for j in range(y):
+                    obj_array[i, j] = []
+    else:
+        obj_array = np.empty((x, y, z), dtype=object)
+        # Initialize each element to an empty list
+        for i in range(x):
+            for j in range(y):
+                for k in range(z):
+                    obj_array[i, j, k] = []
+    
+    return obj_array
+
+def object_array_to_np(obj_data, target_np_array):
+    obj_shape = obj_data.shape
+    
+    for ii in tqdm(range(obj_shape[0])):
+        for jj in range(obj_shape[1]):
+            for kk in range(obj_shape[2]):
+                target_np_array[ii,jj,kk] = np.nanmean(obj_data[ii,jj,kk])
+    return target_np_array
+    
+def create_3d_np_array(x, y, z, fill_value = np.nan):
+    """
+    Create a 3D NumPy array with the specified shape (x, y, z).
+    
+    Parameters:
+    x (int): Size of the first dimension.
+    y (int): Size of the second dimension.
+    z (int): Size of the third dimension.
+    
+    Returns:
+    np.ndarray: 3D NumPy array of shape (x, y, z).
+    """
+    if z == 0:
+        return np.full((x, y), fill_value)
+    else:
+        return np.full((x, y, z), fill_value)
+    
 def load_data(input_fp, file_name, engine="c", clear_cache=False):
     
     if not hasattr(load_data, 'cache'):
@@ -158,36 +214,37 @@ def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_
     return VAR_r
     
 def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
-    #--------------------------BEGIN NOTE------------------------------%
-    # University of Virginia
-    # USDA
-    # HydroAI lab in GIST
-    #--------------------------END NOTE--------------------------------%
-    # ARGUMENTS:
-    # lat_target/ lon_target : Target frame lat/lon data (m x n arrays)
-    # lat_input / lon_input : Satellite lat/lon data (m' x n' arrays)
-    # (NOTE: lat(i,1)>lat(i+1,1) (1<=i<=(size(lat_main,1)-1))
-    #        lon(1,i)<lon(1,i+1) (1<=i<=(size(lon_main,2)-1)) )
-    #
-    # VAR : Satellite's variable (m' x n' array)
-    # method: Method for resampling: (e.g., 'nearest')
-    #
-    # sampling_method: determines the interpolation method or algorithm to be used
-    #             (e.g., linear, nearest, zero, slinear, quadratic, cubic)
-    # agg_method: determines the interpolation order to use when resizing the input array
-    #             (e.g., mean, median, mode, min, max)
-    #
-    # DESCRIPTION:
-    # This code resampled earth coordinates of the specified domain for 
-    # any "target" projection
-    #
-    # REVISION HISTORY: 
-    # 2 Jul 2020 Hyunglok Kim; initial specification in Matlab
-    # 16 May 2023 Hyunglok Kim; converted to Python code
-    # 19 Apr 2024 Hyunglok Kim; Gini-simpson index added
-    # 23 May 2024 Hyunglok Kim; Resampling condition added
-    #-----------------------------------------------------------------%
+    '''
+    --------------------------BEGIN NOTE------------------------------%
+     University of Virginia
+     USDA
+     HydroAI lab in GIST
+    --------------------------END NOTE--------------------------------%
+     ARGUMENTS:
+     lat_target/ lon_target : Target frame lat/lon data (m x n arrays)
+     lat_input / lon_input : Satellite lat/lon data (m' x n' arrays)
+     (NOTE: lat(i,1)>lat(i+1,1) (1<=i<=(size(lat_main,1)-1))
+            lon(1,i)<lon(1,i+1) (1<=i<=(size(lon_main,2)-1)) )
     
+     VAR : Satellite's variable (m' x n' array)
+     method: Method for resampling: (e.g., 'nearest')
+    
+     sampling_method: determines the interpolation method or algorithm to be used
+                 (e.g., linear, nearest, zero, slinear, quadratic, cubic)
+     agg_method: determines the interpolation order to use when resizing the input array
+                 (e.g., mean, median, mode, min, max)
+    
+     DESCRIPTION:
+     This code resampled earth coordinates of the specified domain for 
+     any "target" projection
+    
+     REVISION HISTORY: 
+     2 Jul 2020 Hyunglok Kim; initial specification in Matlab
+     16 May 2023 Hyunglok Kim; converted to Python code
+     19 Apr 2024 Hyunglok Kim; Gini-simpson index added
+     23 May 2024 Hyunglok Kim; Resampling condition added
+    -----------------------------------------------------------------%
+    '''
     if np.array_equal(lon_target, lon_input): # do not resample it if a target and input data are the equal projection/resolution
        return VAR
     else:
@@ -361,9 +418,30 @@ def is_uniform(array, axis):
         raise ValueError("Axis must be 0 (columns) or 1 (rows).")
         
 def find_closest_index(lon_2d, lat_2d, coord):
+    """
+    Find the closest index in a 2D grid of longitude and latitude values to a given coordinate.
+
+    Parameters:
+    lon_2d (np.ndarray): 2D array of longitude values.
+    lat_2d (np.ndarray): 2D array of latitude values.
+    coord (tuple): A tuple containing the longitude and latitude of the target coordinate (lon_value, lat_value).
+
+    Returns:
+    tuple: A tuple containing the indices (lat_idx, lon_idx) of the closest grid point.
+
+    Explanation:
+    The function first checks if the rows of `lon_2d` are uniform and the columns of `lat_2d` are uniform.
+    If both conditions are met, it indicates that the grid is uniform, and the process speed is greatly increased
+    due to direct indexing. If the grids are not uniform, the function uses a KDTree for nearest-neighbor search,
+    which is computationally more intensive.
+
+    REVISION HISTORY: 
+    2 June 2024 Hyunglok Kim; initial specification
+    """
+    
     lon_value, lat_value = coord
 
-    if np.all(is_uniform(lon_2d,1)) and np.all(is_uniform(lat_2d,0)):
+    if np.all(is_uniform(lon_2d, 1)) and np.all(is_uniform(lat_2d, 0)):
         # Case when lon_2d's rows are uniform and lat_2d's columns are uniform
         lon_unique = lon_2d[0, :]
         lat_unique = lat_2d[:, 0]
@@ -380,7 +458,9 @@ def find_closest_index(lon_2d, lat_2d, coord):
         dist, idx = tree.query(coord)
         lat_idx, lon_idx = np.unravel_index(idx, lon_2d.shape)
     
+    lat_idx, lon_idx = int(lat_idx), int(lon_idx)
     return lat_idx, lon_idx
+
     
 def extract_region_from_data(longitude, latitude, X, bounds):
     """

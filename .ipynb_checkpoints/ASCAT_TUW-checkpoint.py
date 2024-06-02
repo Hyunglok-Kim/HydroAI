@@ -1,9 +1,36 @@
+import numpy as np
+import pandas as pd
 import scipy.io
 import os
 import h5py
 import netCDF4
+from datetime import datetime, timedelta
 
+def convert_to_local_time(df):
+    # Function to convert fraction of days since 1900-01-01 00:00:00 UTC to local time
+    # Calculate UTC time
+    base_date = datetime(1900, 1, 1, 0, 0, 0)
+    utc_time = base_date + pd.to_timedelta(df['time'], unit='D')
+
+    # Calculate timezone offset based on longitude
+    timezone_offset_hours = df['lon'] / 15  # 15 degrees per hour
+    timezone_offset = pd.to_timedelta(timezone_offset_hours, unit='H')
+
+    # Convert to local time
+    local_time = utc_time + timezone_offset
+
+    # Convert local time back to fraction of days since 1900-01-01 00:00:00
+    local_time_fraction_days = (local_time - base_date) / timedelta(days=1)
+
+    return local_time_fraction_days
+    
+def calculate_doy(dt, base_year):
+    year_start = datetime(base_year, 1, 1)
+    doy = (dt - year_start).days + 1
+    return doy
+    
 def load_mat_file(mat_file, path):
+    print('This function will be deprecated since HydroAI no longer depends on MATLAB files.')
     # Open MATLAB file
     with h5py.File(mat_file, 'r') as file:
         # Get all variable names
@@ -23,6 +50,7 @@ def load_mat_file(mat_file, path):
     return ASCAT_SM, latitude, longitude
 
 def load_porosity_mat(mat_file):
+    print('This function will be deprecated since HydroAI no longer depends on MATLAB files.')
     if os.path.exists(mat_file):
         data = scipy.io.loadmat(mat_file)
         variables = {}
