@@ -64,7 +64,7 @@ def create_3d_object_array(x, y, z):
 def object_array_to_np(obj_data, target_np_array):
     obj_shape = obj_data.shape
     
-    for ii in tqdm(range(obj_shape[0])):
+    for ii in range(obj_shape[0]):
         for jj in range(obj_shape[1]):
             for kk in range(obj_shape[2]):
                 target_np_array[ii,jj,kk] = np.nanmean(obj_data[ii,jj,kk])
