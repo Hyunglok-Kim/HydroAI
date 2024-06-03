@@ -526,9 +526,9 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 
     # Construct the search pattern
     if recursive:
-        pattern = f"{directory_path}/**/*{file_extension}"
+        pattern = os.path.join(directory_path, '**', f'*{file_extension}')
     else:
-        pattern = f"{directory_path}/*{file_extension}"
+        pattern = os.path.join(directory_path, f'*{file_extension}')
 
     # Get a list of all files matching the pattern
     file_paths = glob.glob(pattern, recursive=recursive)
@@ -537,7 +537,8 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
     if filter_strs:
         filtered_paths = []
         for file_path in file_paths:
-            if any(substring in os.path.basename(file_path) for substring in filter_strs):
+            base_name = os.path.basename(file_path)
+            if any(substring.strip("'\"") in base_name for substring in filter_strs):
                 filtered_paths.append(file_path)
         file_paths = filtered_paths
 
@@ -546,13 +547,16 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 
     return file_paths
 
+
 # Example usage
 #directory_path = '/data/X'
 #file_extension = 'hdf'  # Example file format
 # Get all text files
 # all_txt_files = get_file_list(directory, file_ext)
 # Get text files that include "abs", "2021", or "report" in the filename
-# filtered_txt_files = get_file_list(directory, file_ext, filter_strs=["abs", "2021", "report"])
+# filtered_txt_files = get_file_list(directory, file_ext, filter_strs=["abs","report"])
+# or
+# filtered_txt_files = get_file_list(directory, file_ext, filter_strs=['abs'])
 
 ### netcdf modules ###
 def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
@@ -651,7 +655,7 @@ def get_nc_variable_names_units(nc_file_path):
 
     return variable_names, variable_units_list, variable_long_names_list
 
-def get_variable_from_nc(nc_file_path, variable_name, layer_index=0, flip_data=True):
+def get_variable_from_nc(nc_file_path, variable_name, layer_index='all', flip_data=False):
     """
     Extract a specific layer (if 3D), the entire array (if 2D or 1D), or the value (if 0D) of a variable
     from a NetCDF file and return it as a NumPy array, with fill values replaced by np.nan.
