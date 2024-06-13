@@ -10,28 +10,43 @@ import cartopy.feature as cfeature
 import cartopy.mpl.gridliner as gridliner
 
 class SentinelBandReader:
-    def __init__(self, folder_path):
+    def __init__(self, folder_path, product='S30'):
         self.folder_path = folder_path
         self.scale_factor = 0.0001
         self.fill_value = -9999
         # Define the mapping of band nicknames to file names
-        self.band_files = {
-            'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
-            'blue': 'B02_merged_WGS84.tif',     # Blue band
-            'green': 'B03_merged_WGS84.tif',    # Green band
-            'red': 'B04_merged_WGS84.tif',      # Red band
-            'red_edge1': 'B05_merged_WGS84.tif',# Red edge 1
-            'red_edge2': 'B06_merged_WGS84.tif',# Red edge 2
-            'red_edge3': 'B07_merged_WGS84.tif',# Red edge 3
-            'nir': 'B08_merged_WGS84.tif',      # Near-infrared
-            'red_edge4': 'B8A_merged_WGS84.tif',# Red edge 4
-            'water_vapor': 'B09_merged_WGS84.tif', # Water vapor
-            'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
-            'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
-            'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
-            'qa': 'Fmask_merged_WGS84.tif'       # QA band
-        }
-
+        if product == 'S30':
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'red_edge1': 'B05_merged_WGS84.tif',# Red edge 1
+                'red_edge2': 'B06_merged_WGS84.tif',# Red edge 2
+                'red_edge3': 'B07_merged_WGS84.tif',# Red edge 3
+                'nir': 'B08_merged_WGS84.tif',      # Near-infrared
+                'red_edge4': 'B8A_merged_WGS84.tif',# Red edge 4
+                'water_vapor': 'B09_merged_WGS84.tif', # Water vapor
+                'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
+                'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
+                'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
+        else: # product = 'L30'
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'nir': 'B05_merged_WGS84.tif',# Near infrared
+                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
+                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
+                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
+                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
+                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
+            
     def get_band_with_transform(self, band):
         """Return band data along with its affine transform."""
         band_file = self.band_files.get(band)
