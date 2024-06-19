@@ -54,7 +54,7 @@ def generate_lon_lat_e2grid(resolution_key):
     return longitudes, latitudes
 
 ### ----------------------------------------------- ###
-def generate_lon_lat_eqdgrid(*args):
+def generate_lon_lat_eqdgrid(*args, bounds=[]):
     """
     Generates 2D arrays of latitudes and longitudes. The function can either take a single argument specifying the 
     resolution in degrees or two arguments specifying the number of latitude and longitude points.
@@ -62,7 +62,8 @@ def generate_lon_lat_eqdgrid(*args):
     Args:
     *args: Variable length argument list. Can be either a single float indicating resolution in degrees, or two
            integers indicating the number of latitude and longitude points (grid rows and columns).
-
+    bounds: List of cropped bounds. (e.g., bounds = [125.7, 129.7, 33.9, 38.8] # entire Korea)
+    
     Returns:
     tuple: Two 2D numpy arrays containing the latitude and longitude values respectively.
     """
@@ -85,6 +86,21 @@ def generate_lon_lat_eqdgrid(*args):
     latitudes = np.linspace(90 - lat_step / 2, -90 + lat_step / 2, y_dim)
     longitudes = np.linspace(-180 + lon_step / 2, 180 - lon_step / 2, x_dim)
 
+    # Crop latitude and longitude for bound area
+    if bounds != []:
+        lon_crop = (longitudes > bounds[0]) & (longitudes < bounds[1])
+        lat_crop = (latitudes > bounds[2]) & (latitudes < bounds[3])
+
+        lon_indices = np.where(lon_crop)[0]
+        lat_indices = np.where(lat_crop)[0]
+
+        min_lon, max_lon = lon_indices.min(), lon_indices.max()
+        min_lat, max_lat = lat_indices.min(), lat_indices.max()
+        
+        # Crop lat, lon, data
+        longitudes = longitudes[min_lon:max_lon+1]
+        latitudes = latitudes[min_lat:max_lat+1]
+    
     # Mesh the latitude and longitude values to create 2D arrays
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
     return lon_grid, lat_grid
@@ -94,3 +110,4 @@ def generate_lon_lat_eqdgrid(*args):
 #x_dim = 7200  # Number of longitude points
 #lat_grid, lon_grid = create_geo_grid(y_dim, x_dim)
 #lat_grid, lon_grid = create_geo_grid('0.05')
+#domain_lon, domain_lat = generate_lon_lat_eqdgrid(0.01, bounds=[125.7, 129.7, 33.9, 38.8]) # 1km resolution & entire Korea
