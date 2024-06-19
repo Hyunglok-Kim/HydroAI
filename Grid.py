@@ -62,7 +62,8 @@ def generate_lon_lat_eqdgrid(*args, bounds=[]):
     Args:
     *args: Variable length argument list. Can be either a single float indicating resolution in degrees, or two
            integers indicating the number of latitude and longitude points (grid rows and columns).
-
+    bounds: List of cropped bounds. (e.g., bounds = [125.7, 129.7, 33.9, 38.8] # entire Korea)
+    
     Returns:
     tuple: Two 2D numpy arrays containing the latitude and longitude values respectively.
     """
@@ -109,3 +110,4 @@ def generate_lon_lat_eqdgrid(*args, bounds=[]):
 #x_dim = 7200  # Number of longitude points
 #lat_grid, lon_grid = create_geo_grid(y_dim, x_dim)
 #lat_grid, lon_grid = create_geo_grid('0.05')
+#domain_lon, domain_lat = generate_lon_lat_eqdgrid(0.01, bounds=[125.7, 129.7, 33.9, 38.8]) # 1km resolution & entire Korea
