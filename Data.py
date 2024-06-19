@@ -578,7 +578,10 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     # Define the dimensions
     rows, cols = latitude.shape
     # Assuming all data variables have the same 'time' dimension size
-    doy = next(iter(data_vars.values())).shape[2]
+    if next(iter(data_vars.values())).ndim == 1:
+        doy = next(iter(data_vars.values())).shape[0]
+    else:
+        doy = next(iter(data_vars.values())).shape[2]
 
     # Create dimensions in the NetCDF file
     nc_data.createDimension('latitude', rows)
@@ -596,7 +599,13 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     # Create variables and assign data for each item in data_vars
     for var_name, var_data in data_vars.items():
         # Create variable in NetCDF file
-        nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
+        if var_data.ndim == 1:
+            if isinstance(var_data[0], np.int64):
+                nc_var = nc_data.createVariable(var_name, 'i4', ('doy', ))
+            else:
+                nc_var = nc_data.createVariable(var_name, 'f4', ('doy', ))
+        else:  
+            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
         # Assign data to the variable
         nc_var[:] = var_data
 

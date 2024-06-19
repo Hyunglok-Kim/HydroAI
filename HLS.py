@@ -46,7 +46,10 @@ class SentinelBandReader:
                 'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
                 'qa': 'Fmask_merged_WGS84.tif'       # QA band
             }
-            
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
     def get_band_with_transform(self, band):
         """Return band data along with its affine transform."""
         band_file = self.band_files.get(band)
