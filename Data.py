@@ -579,14 +579,14 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     rows, cols = latitude.shape
     # Assuming all data variables have the same 'time' dimension size
     if next(iter(data_vars.values())).ndim == 1:
-        doy = next(iter(data_vars.values())).shape[0]
+        time = next(iter(data_vars.values())).shape[0]
     else:
-        doy = next(iter(data_vars.values())).shape[2]
+        time = next(iter(data_vars.values())).shape[2]
 
     # Create dimensions in the NetCDF file
     nc_data.createDimension('latitude', rows)
     nc_data.createDimension('longitude', cols)
-    nc_data.createDimension('doy', doy)
+    nc_data.createDimension('time', time)
 
     # Create latitude and longitude variables
     lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
@@ -601,11 +601,11 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
         # Create variable in NetCDF file
         if var_data.ndim == 1:
             if isinstance(var_data[0], np.int64):
-                nc_var = nc_data.createVariable(var_name, 'i4', ('doy', ))
+                nc_var = nc_data.createVariable(var_name, 'i4', ('time', ))
             else:
-                nc_var = nc_data.createVariable(var_name, 'f4', ('doy', ))
+                nc_var = nc_data.createVariable(var_name, 'f4', ('time', ))
         else:  
-            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
+            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'time'))
         # Assign data to the variable
         nc_var[:] = var_data
 
@@ -619,6 +619,7 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
 #        nc_file    = nc_file_name,
 #        latitude   = domain_lat,
 #        longitude  = domain_lon,
+#        study_dates = study_dates, # 1D list of integer like [20240101, 20240102, ...]
 #        Resampled_SMOS_SM    = Resampled_SMOS_SM,
 #        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC)
 
