@@ -14,6 +14,7 @@ class SentinelBandReader:
         self.folder_path = folder_path
         self.scale_factor = 0.0001
         self.fill_value = -9999
+        self.qa_fill_value = 255
         # Define the mapping of band nicknames to file names
         if product == 'S30':
             self.band_files = {
@@ -67,10 +68,17 @@ class SentinelBandReader:
     def _read_band(self, band_file):
         """Read and process a single band file."""
         path = f"{self.folder_path}/{band_file}"
+
+        mask_list = ['cirrus', 'coastal']
+        if self.product == 'S30': mask_list.append('water_vapor')
+
         with rasterio.open(path) as src:
-            band_data = src.read(1).astype('float32')
+            band_data = src.read(1)
             # Apply fill value and scaling factor for non-atmospheric correction bands
-            if 'water_vapor' not in band_file and 'cirrus' not in band_file and 'coastal' not in band_file and 'qa' not in band_file:
+            if band_file == self.band_files['qa']:
+                # 'qa' differs from others due to its fill_value and not requiring scale_factor multiplication
+                processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+            elif band_file not in [self.band_files[x] for x in mask_list]:
                 processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
                 processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
             else:
@@ -110,6 +118,9 @@ class SentinelBandReader:
 #nir_data = s2_reader.nir  # Near-infrared band
 #swir1_data = s2_reader.swir1  # Short-wave infrared 1
 #qa_data = s2_reader.qa  # QA band
+
+# Other method
+#red_data = s2_reader['red'] # Red band by using __getitem__(self, key)
 
 #print("Red Band Data:")
 #print(red_data)
