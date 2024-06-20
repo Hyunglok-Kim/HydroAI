@@ -620,9 +620,11 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars, time_arg='doy'
 #        nc_file    = nc_file_name,
 #        latitude   = domain_lat,
 #        longitude  = domain_lon,
-#        study_dates = study_dates, # 1D list of integer like [20240101, 20240102, ...]
+#        study_dates = study_dates,                   # 1D list of integer such as [20240101, 20240102, ...]
 #        Resampled_SMOS_SM    = Resampled_SMOS_SM,
-#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC)
+#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC,
+#        time_arg = 'dates_yymmdd'                       # Default argument is 'doy'. This argument means name of time axis.
+#        )
 
 def get_nc_variable_names_units(nc_file_path):
     """
