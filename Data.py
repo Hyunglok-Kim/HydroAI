@@ -559,7 +559,7 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 # filtered_txt_files = get_file_list(directory, file_ext, filter_strs=['abs'])
 
 ### netcdf modules ###
-def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
+def create_netcdf_file(nc_file, longitude, latitude, **data_vars, time_arg='doy'):
     """
     Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
 
@@ -568,6 +568,7 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
         latitude (np.array): 2D array of latitude values.
         longitude (np.array): 2D array of longitude values.
         data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
+        time_arg (str): Name of time axis.
 
     Returns:
         None
@@ -586,7 +587,7 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     # Create dimensions in the NetCDF file
     nc_data.createDimension('latitude', rows)
     nc_data.createDimension('longitude', cols)
-    nc_data.createDimension('time', time)
+    nc_data.createDimension(time_arg, time)
 
     # Create latitude and longitude variables
     lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
@@ -601,11 +602,11 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
         # Create variable in NetCDF file
         if var_data.ndim == 1:
             if isinstance(var_data[0], np.int64):
-                nc_var = nc_data.createVariable(var_name, 'i4', ('time', ))
+                nc_var = nc_data.createVariable(var_name, 'i4', (time_arg, ))
             else:
-                nc_var = nc_data.createVariable(var_name, 'f4', ('time', ))
+                nc_var = nc_data.createVariable(var_name, 'f4', (time_arg, ))
         else:  
-            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'time'))
+            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', time_arg))
         # Assign data to the variable
         nc_var[:] = var_data
 
@@ -619,9 +620,11 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
 #        nc_file    = nc_file_name,
 #        latitude   = domain_lat,
 #        longitude  = domain_lon,
-#        study_dates = study_dates, # 1D list of integer like [20240101, 20240102, ...]
+#        study_dates = study_dates,                   # 1D list of integer such as [20240101, 20240102, ...]
 #        Resampled_SMOS_SM    = Resampled_SMOS_SM,
-#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC)
+#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC,
+#        time_arg = 'dates_yymmdd'                       # Default argument is 'doy'. This argument means name of time axis.
+#        )
 
 def get_nc_variable_names_units(nc_file_path):
     """

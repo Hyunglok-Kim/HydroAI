@@ -11,6 +11,7 @@ import cartopy.mpl.gridliner as gridliner
 
 class SentinelBandReader:
     def __init__(self, folder_path, product='S30'):
+        self.product = product
         self.folder_path = folder_path
         self.scale_factor = 0.0001
         self.fill_value = -9999
