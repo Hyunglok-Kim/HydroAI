@@ -559,7 +559,7 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 # filtered_txt_files = get_file_list(directory, file_ext, filter_strs=['abs'])
 
 ### netcdf modules ###
-def create_netcdf_file(nc_file, longitude, latitude, **data_vars, time_arg='doy'):
+def create_netcdf_file(nc_file, longitude, latitude, time_arg='doy', **data_vars):
     """
     Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
 
