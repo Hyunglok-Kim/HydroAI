@@ -32,11 +32,11 @@ def correct_shape(var_data):
 
     return var_data
 
-def create_mask(var_data):
+def create_mask(nc_data, var, var_data):
     try:
         # Replace Fill value into np.nan
         fill_value = np.float64(nc_data.variables[var]._FillValue)
         var_data[var_data == fill_value] = np.nan
     except AttributeError:
-        print(f"{mission} nc file has no FillValue attribute!")
+        print(f"{var} has no FillValue attribute!")
     return var_data
