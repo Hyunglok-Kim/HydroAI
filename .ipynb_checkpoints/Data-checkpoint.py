@@ -213,7 +213,7 @@ def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_
 
     return VAR_r
     
-def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
+def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=2):
     '''
     --------------------------BEGIN NOTE------------------------------%
      University of Virginia
@@ -559,7 +559,7 @@ def get_file_list(directory_path, file_extension, recursive=True, filter_strs=No
 # filtered_txt_files = get_file_list(directory, file_ext, filter_strs=['abs'])
 
 ### netcdf modules ###
-def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
+def create_netcdf_file(nc_file, longitude, latitude, time_arg='doy', **data_vars):
     """
     Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
 
@@ -568,6 +568,7 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
         latitude (np.array): 2D array of latitude values.
         longitude (np.array): 2D array of longitude values.
         data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
+        time_arg (str): Name of time axis.
 
     Returns:
         None
@@ -578,12 +579,15 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     # Define the dimensions
     rows, cols = latitude.shape
     # Assuming all data variables have the same 'time' dimension size
-    doy = next(iter(data_vars.values())).shape[2]
+    if next(iter(data_vars.values())).ndim == 1:
+        time = next(iter(data_vars.values())).shape[0]
+    else:
+        time = next(iter(data_vars.values())).shape[2]
 
     # Create dimensions in the NetCDF file
     nc_data.createDimension('latitude', rows)
     nc_data.createDimension('longitude', cols)
-    nc_data.createDimension('doy', doy)
+    nc_data.createDimension(time_arg, time)
 
     # Create latitude and longitude variables
     lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
@@ -596,7 +600,13 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     # Create variables and assign data for each item in data_vars
     for var_name, var_data in data_vars.items():
         # Create variable in NetCDF file
-        nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', 'doy'))
+        if var_data.ndim == 1:
+            if isinstance(var_data[0], np.int64):
+                nc_var = nc_data.createVariable(var_name, 'i4', (time_arg, ))
+            else:
+                nc_var = nc_data.createVariable(var_name, 'f4', (time_arg, ))
+        else:  
+            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', time_arg))
         # Assign data to the variable
         nc_var[:] = var_data
 
@@ -610,8 +620,11 @@ def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
 #        nc_file    = nc_file_name,
 #        latitude   = domain_lat,
 #        longitude  = domain_lon,
+#        study_dates = study_dates,                   # 1D list of integer such as [20240101, 20240102, ...]
 #        Resampled_SMOS_SM    = Resampled_SMOS_SM,
-#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC)
+#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC,
+#        time_arg = 'dates_yymmdd'                       # Default argument is 'doy'. This argument means name of time axis.
+#        )
 
 def get_nc_variable_names_units(nc_file_path):
     """

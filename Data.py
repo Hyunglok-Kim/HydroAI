@@ -213,7 +213,7 @@ def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_
 
     return VAR_r
     
-def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=1):
+def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=2):
     '''
     --------------------------BEGIN NOTE------------------------------%
      University of Virginia

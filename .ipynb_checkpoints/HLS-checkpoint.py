@@ -10,28 +10,48 @@ import cartopy.feature as cfeature
 import cartopy.mpl.gridliner as gridliner
 
 class SentinelBandReader:
-    def __init__(self, folder_path):
+    def __init__(self, folder_path, product='S30'):
+        self.product = product
         self.folder_path = folder_path
         self.scale_factor = 0.0001
         self.fill_value = -9999
+        self.qa_fill_value = 255
         # Define the mapping of band nicknames to file names
-        self.band_files = {
-            'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
-            'blue': 'B02_merged_WGS84.tif',     # Blue band
-            'green': 'B03_merged_WGS84.tif',    # Green band
-            'red': 'B04_merged_WGS84.tif',      # Red band
-            'red_edge1': 'B05_merged_WGS84.tif',# Red edge 1
-            'red_edge2': 'B06_merged_WGS84.tif',# Red edge 2
-            'red_edge3': 'B07_merged_WGS84.tif',# Red edge 3
-            'nir': 'B08_merged_WGS84.tif',      # Near-infrared
-            'red_edge4': 'B8A_merged_WGS84.tif',# Red edge 4
-            'water_vapor': 'B09_merged_WGS84.tif', # Water vapor
-            'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
-            'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
-            'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
-            'qa': 'Fmask_merged_WGS84.tif'       # QA band
-        }
+        if product == 'S30':
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'red_edge1': 'B05_merged_WGS84.tif',# Red edge 1
+                'red_edge2': 'B06_merged_WGS84.tif',# Red edge 2
+                'red_edge3': 'B07_merged_WGS84.tif',# Red edge 3
+                'nir': 'B08_merged_WGS84.tif',      # Near-infrared
+                'red_edge4': 'B8A_merged_WGS84.tif',# Red edge 4
+                'water_vapor': 'B09_merged_WGS84.tif', # Water vapor
+                'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
+                'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
+                'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
+        else: # product = 'L30'
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'nir': 'B05_merged_WGS84.tif',# Near infrared
+                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
+                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
+                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
+                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
+                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
 
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
     def get_band_with_transform(self, band):
         """Return band data along with its affine transform."""
         band_file = self.band_files.get(band)
@@ -49,10 +69,17 @@ class SentinelBandReader:
     def _read_band(self, band_file):
         """Read and process a single band file."""
         path = f"{self.folder_path}/{band_file}"
+
+        mask_list = ['cirrus', 'coastal']
+        if self.product == 'S30': mask_list.append('water_vapor')
+
         with rasterio.open(path) as src:
-            band_data = src.read(1).astype('float32')
+            band_data = src.read(1)
             # Apply fill value and scaling factor for non-atmospheric correction bands
-            if 'water_vapor' not in band_file and 'cirrus' not in band_file and 'coastal' not in band_file and 'qa' not in band_file:
+            if band_file == self.band_files['qa']:
+                # 'qa' differs from others due to its fill_value and not requiring scale_factor multiplication
+                processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+            elif band_file not in [self.band_files[x] for x in mask_list]:
                 processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
                 processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
             else:
@@ -92,6 +119,9 @@ class SentinelBandReader:
 #nir_data = s2_reader.nir  # Near-infrared band
 #swir1_data = s2_reader.swir1  # Short-wave infrared 1
 #qa_data = s2_reader.qa  # QA band
+
+# Other method
+#red_data = s2_reader['red'] # Red band by using __getitem__(self, key)
 
 #print("Red Band Data:")
 #print(red_data)
@@ -315,3 +345,60 @@ class WaterIndicesCalculator:
 #s2_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
 #s2_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
 #------------------------------------------------------#
+
+#----- Sentinel QA -----#
+# Combine conditions and return an array where 0 indicates clear and 1 indicates not clear
+#Bits 7-6 (Aerosol Level)
+#11: High aerosol concentration
+#10: Moderate aerosol concentration
+#01: Low aerosol concentration
+#00: Climatology aerosol (default or typical value based on climatological data)
+#
+#Bit 5 (Water)
+#1: Presence of water
+#0: No water
+#
+#Bit 4 (Snow/Ice)
+#1: Presence of snow/ice
+#0: No snow/ice
+#Bit 3 (Cloud Shadow)
+#1: Presence of cloud shadow
+#0: No cloud shadow
+#Bit 2 (Adjacent to Cloud/Shadow)
+#1: Proximity to cloud or shadow
+#0: Not adjacent to cloud or shadow
+#Bit 1 (Cloud)
+#1: Presence of clouds
+#0: No clouds
+#Bit 0 (Cirrus)
+#Reserved for future use or a specific purpose not yet implemented (NA).
+
+def is_cloud(values):
+    # Convert values to a numpy array if not already one
+    values = np.array(values, dtype=np.uint8)
+
+    # Check if all values are within the byte range
+    if np.any((values < 0) | (values > 255)):
+        raise ValueError("All values must be between 0 and 255")
+    
+    # Apply bitwise operations to check conditions across the entire array
+    cloud_free = (values & (1 << 1)) == 0
+    cloud_shadow_free = (values & (1 << 3)) == 0
+    not_adjacent_to_cloud_shadow = (values & (1 << 2)) == 0
+
+    # Combine conditions and return an array where 0 indicates clear and 1 indicates not clear
+    return np.where(cloud_free & cloud_shadow_free & not_adjacent_to_cloud_shadow, 0, 1)
+
+def is_water(values):
+    # Convert values to a numpy array if not already one
+    values = np.array(values, dtype=np.uint8)
+
+    # Check if all values are within the byte range
+    if np.any((values < 0) | (values > 255)):
+        raise ValueError("All values must be between 0 and 255")
+
+    # Apply bitwise operations to check water presence across the entire array
+    water_present = (values & (1 << 5)) != 0
+
+    # Return an array where 1 indicates water present and 0 indicates no water
+    return np.where(water_present, 1, 0)

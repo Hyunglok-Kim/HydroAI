@@ -345,3 +345,60 @@ class WaterIndicesCalculator:
 #s2_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
 #s2_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
 #------------------------------------------------------#
+
+#----- Sentinel QA -----#
+# Combine conditions and return an array where 0 indicates clear and 1 indicates not clear
+#Bits 7-6 (Aerosol Level)
+#11: High aerosol concentration
+#10: Moderate aerosol concentration
+#01: Low aerosol concentration
+#00: Climatology aerosol (default or typical value based on climatological data)
+#
+#Bit 5 (Water)
+#1: Presence of water
+#0: No water
+#
+#Bit 4 (Snow/Ice)
+#1: Presence of snow/ice
+#0: No snow/ice
+#Bit 3 (Cloud Shadow)
+#1: Presence of cloud shadow
+#0: No cloud shadow
+#Bit 2 (Adjacent to Cloud/Shadow)
+#1: Proximity to cloud or shadow
+#0: Not adjacent to cloud or shadow
+#Bit 1 (Cloud)
+#1: Presence of clouds
+#0: No clouds
+#Bit 0 (Cirrus)
+#Reserved for future use or a specific purpose not yet implemented (NA).
+
+def is_cloud(values):
+    # Convert values to a numpy array if not already one
+    values = np.array(values, dtype=np.uint8)
+
+    # Check if all values are within the byte range
+    if np.any((values < 0) | (values > 255)):
+        raise ValueError("All values must be between 0 and 255")
+    
+    # Apply bitwise operations to check conditions across the entire array
+    cloud_free = (values & (1 << 1)) == 0
+    cloud_shadow_free = (values & (1 << 3)) == 0
+    not_adjacent_to_cloud_shadow = (values & (1 << 2)) == 0
+
+    # Combine conditions and return an array where 0 indicates clear and 1 indicates not clear
+    return np.where(cloud_free & cloud_shadow_free & not_adjacent_to_cloud_shadow, 0, 1)
+
+def is_water(values):
+    # Convert values to a numpy array if not already one
+    values = np.array(values, dtype=np.uint8)
+
+    # Check if all values are within the byte range
+    if np.any((values < 0) | (values > 255)):
+        raise ValueError("All values must be between 0 and 255")
+
+    # Apply bitwise operations to check water presence across the entire array
+    water_present = (values & (1 << 5)) != 0
+
+    # Return an array where 1 indicates water present and 0 indicates no water
+    return np.where(water_present, 1, 0)
