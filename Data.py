@@ -15,6 +15,7 @@ import glob
 import netCDF4
 from netCDF4 import Dataset
 from tabulate import tabulate
+import h5py
 
 import matplotlib.pyplot as plt
 
@@ -774,3 +775,91 @@ def read_hdf4_variable(input_file, variable_name):
         print(f"Failed to read '{variable_name}' from HDF4 file {input_file}: {e}")
         return None
 ### ------------------------------------------- ###
+
+### h5 modules ###
+def get_h5_variable_names_units(h5_file_path):
+    """
+    Get a list of variable names, a corresponding list of their units,
+    and a corresponding list of their long names from an HDF5 file.
+    Additionally, print this information in a table format.
+
+    :param h5_file_path: Path to the HDF5 file.
+    :return: A list of variable names, a list of units for these variables,
+             and a list of long names for these variables.
+    """
+    variable_names = []
+    variable_units_list = []
+    variable_long_names_list = []
+
+    with h5py.File(h5_file_path, 'r') as file:
+        def extract_attributes(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                variable_names.append(name)
+                # Try to get the 'units' attribute for the variable
+                units = obj.attrs.get('units', None)
+                variable_units_list.append(units)
+                # Try to get the 'long_name' attribute for the variable
+                long_name = obj.attrs.get('long_name', None)
+                variable_long_names_list.append(long_name)
+        
+        # Recursively visit all items in the HDF5 file and extract attributes
+        file.visititems(extract_attributes)
+    
+    # Prepare the data for tabulation
+    table_data = zip(variable_names, variable_long_names_list, variable_units_list)
+
+    # Print the results in a table-like format
+    print(tabulate(table_data, headers=["Name", "Long Name", "Units"], tablefmt="grid"))
+
+    return variable_names, variable_units_list, variable_long_names_list
+
+def get_variable_from_h5(h5_file_path, variable_name, layer_index='all', flip_data=False):
+    """
+    Extract a specific layer (if 3D), the entire array (if 2D or 1D), or the value (if 0D) of a variable
+    from an HDF5 file and return it as a NumPy array, with fill values replaced by np.nan.
+
+    :param h5_file_path: Path to the HDF5 file.
+    :param variable_name: Full path name of the variable to extract.
+    :param layer_index: The index of the layer to extract if the variable is 3D. Default is 'all'.
+    :param flip_data: Boolean to indicate if the data should be flipped upside down. Default is False.
+    :return: NumPy array or scalar of the specified variable data, with np.nan for fill values.
+    """
+    with h5py.File(h5_file_path, 'r') as file:
+        # Check if the variable exists in the HDF5 file
+        if variable_name in file:
+            variable = file[variable_name]
+            
+            # Extract data based on the number of dimensions
+            data = variable[:]
+            if variable.ndim == 4:
+                if layer_index == 'all':
+                    data = data[:, 0, :, :]
+                else:
+                    data = data[layer_index, 0, :, :]
+            elif variable.ndim == 3:
+                if layer_index == 'all':
+                    data = data[:, :, :]
+                else:
+                    data = data[layer_index, :, :]
+            elif variable.ndim == 2:
+                data = data[:, :]
+            elif variable.ndim == 1:
+                data = data[:]
+            elif variable.ndim == 0:
+                data = data[()]
+            else:
+                raise ValueError(f"Variable '{variable_name}' has unsupported number of dimensions: {variable.ndim}.")
+            
+            # Handle fill values (mask to NaN if necessary)
+            if isinstance(data, np.ma.MaskedArray):
+                fill_value = np.nan if np.issubdtype(data.dtype, np.floating) else -9999
+                data = data.filled(fill_value)
+                data = np.where(data == -9999, np.nan, data)  # Replace fill_value with NaN for integer arrays
+            
+            # Flip the data upside down if it's 2D or 3D (common in geographical data to match orientation)
+            if flip_data and variable.ndim in [2, 3]:
+                data = np.flipud(data)
+            
+            return data
+        else:
+            raise ValueError(f"Variable '{variable_name}' does not exist in the HDF5 file.")
