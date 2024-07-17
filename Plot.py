@@ -138,10 +138,10 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     # Calculate the extent from the longitude and latitude
     
     # Set map extent if bounds are provided, else use the calculated extent
-    if bounds:
-        ax.set_extent(bounds, crs=ccrs.PlateCarree())
-    elif bounds == 'global':
+    if bounds == 'global':
         ax.set_global()
+    elif bounds:
+        ax.set_extent(bounds, crs=ccrs.PlateCarree())
     else:
         extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
         ax.set_extent(extent, crs=ccrs.PlateCarree())

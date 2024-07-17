@@ -863,3 +863,43 @@ def get_variable_from_h5(h5_file_path, variable_name, layer_index='all', flip_da
             return data
         else:
             raise ValueError(f"Variable '{variable_name}' does not exist in the HDF5 file.")
+
+#---- UTC to LT ----#
+# Function to calculate local time for a given longitude
+def calculate_local_time(utc_time, longitude):
+    # Calculate the time difference in hours
+    time_difference = longitude / 15.0
+    # Calculate local time
+    local_time = utc_time + timedelta(hours=time_difference)
+    return local_time
+
+def doy_to_yearyyyymmdd(year, doy):
+    # Create a date object for the first day of the given year
+    start_date = datetime(year, 1, 1)
+    # Add the DOY to the start date to get the correct date
+    target_date = start_date + timedelta(days=doy - 1)
+    # Format the output as yearmmdd
+    formatted_date = target_date.strftime('%Y%m%d')
+    return formatted_date
+
+def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=0):
+    reference_time = datetime(2000, 1, 1, 3, 0, 0)
+    t_nc_file_paths = get_file_list(data_FP, 'nc4', filter_strs=[doy_to_yearyyyymmdd(year, doy-1), doy_to_yearyyyymmdd(year, doy), doy_to_yearyyyymmdd(year, doy+1)])
+    t_var_LT_combined = np.full((lon.shape), np.nan)
+    
+    for i in t_nc_file_paths:
+        t_var = get_variable_from_nc(i, var_name, layer_index=layer_index, flip_data='False')
+        t_UTC_time = get_variable_from_nc(i, 'time', layer_index=0, flip_data='False')
+        
+        # Convert observed minutes to a datetime object
+        t_UTC_time = reference_time + timedelta(minutes=t_UTC_time[0])
+        t_local_times = np.array([calculate_local_time(t_UTC_time, lon) for lon in lon[0,:]])
+        # Select areas where local time is target local time (e.g., 6 AM)
+        t_selected_indices = np.where([(lt.year == year) & (lt.day == int(doy_to_yearyyyymmdd(year, doy)[7:8])) & (target_local_time - 1 <= lt.hour <= target_local_time + 1) for lt in t_local_times])[0]
+    
+        if t_selected_indices.size>0:
+            t_var_LT_combined[:, t_selected_indices] = t_var[:, t_selected_indices]
+    print(doy_to_yearyyyymmdd(year, doy), 'at ', target_local_time ,' local time.')
+
+    return t_var_LT_combined
+
