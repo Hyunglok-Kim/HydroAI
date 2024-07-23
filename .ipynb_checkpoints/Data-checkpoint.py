@@ -582,6 +582,8 @@ def create_netcdf_file(nc_file, longitude, latitude, time_arg='doy', **data_vars
     # Assuming all data variables have the same 'time' dimension size
     if next(iter(data_vars.values())).ndim == 1:
         time = next(iter(data_vars.values())).shape[0]
+    elif next(iter(data_vars.values())).ndim == 2:
+        time = 1
     else:
         time = next(iter(data_vars.values())).shape[2]
 
@@ -882,12 +884,30 @@ def doy_to_yearyyyymmdd(year, doy):
     formatted_date = target_date.strftime('%Y%m%d')
     return formatted_date
 
+def days_in_year(year):
+    """
+    Return the number of days in a given year.
+    
+    :param year: The year to check.
+    :return: 366 if the year is a leap year, otherwise 365.
+    """
+    if (year % 4 == 0):
+        if (year % 100 == 0):
+            if (year % 400 == 0):
+                return 366
+            else:
+                return 365
+        else:
+            return 366
+    else:
+        return 365
+
 def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=0):
     reference_time = datetime(2000, 1, 1, 3, 0, 0)
     t_nc_file_paths = get_file_list(data_FP, 'nc4', filter_strs=[doy_to_yearyyyymmdd(year, doy-1), doy_to_yearyyyymmdd(year, doy), doy_to_yearyyyymmdd(year, doy+1)])
     t_var_LT_combined = np.full((lon.shape), np.nan)
     
-    for i in t_nc_file_paths:
+    for i in tqdm(t_nc_file_paths, desc='Processing files', unit='file'):
         t_var = get_variable_from_nc(i, var_name, layer_index=layer_index, flip_data='False')
         t_UTC_time = get_variable_from_nc(i, 'time', layer_index=0, flip_data='False')
         
