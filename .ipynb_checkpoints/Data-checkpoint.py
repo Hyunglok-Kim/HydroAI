@@ -902,8 +902,7 @@ def days_in_year(year):
     else:
         return 365
 
-def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=0):
-    reference_time = datetime(2000, 1, 1, 3, 0, 0)
+def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=0, time_interval=1, reference_time = datetime(2000, 1, 1, 3, 0, 0)):
     t_nc_file_paths = get_file_list(data_FP, 'nc4', filter_strs=[doy_to_yearyyyymmdd(year, doy-1), doy_to_yearyyyymmdd(year, doy), doy_to_yearyyyymmdd(year, doy+1)])
     t_var_LT_combined = np.full((lon.shape), np.nan)
     
@@ -915,11 +914,14 @@ def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=
         t_UTC_time = reference_time + timedelta(minutes=t_UTC_time[0])
         t_local_times = np.array([calculate_local_time(t_UTC_time, lon) for lon in lon[0,:]])
         # Select areas where local time is target local time (e.g., 6 AM)
-        t_selected_indices = np.where([(lt.year == year) & (lt.day == int(doy_to_yearyyyymmdd(year, doy)[7:8])) & (target_local_time - 1 <= lt.hour <= target_local_time + 1) for lt in t_local_times])[0]
+        t_selected_indices = np.where([(lt.year == year) & 
+                                       (lt.month == int(doy_to_yearyyyymmdd(year, doy)[4:6])) &
+                                       (lt.day == int(doy_to_yearyyyymmdd(year, doy)[6:8])) &
+                                       (target_local_time - time_interval <= lt.hour <= target_local_time + time_interval) for lt in t_local_times])[0]
     
         if t_selected_indices.size>0:
             t_var_LT_combined[:, t_selected_indices] = t_var[:, t_selected_indices]
-    print(doy_to_yearyyyymmdd(year, doy), 'at ', target_local_time ,' local time.')
+    print(doy_to_yearyyyymmdd(year, doy), 'at ', target_local_time ,'+-', str(time_interval),'local time.')
 
     return t_var_LT_combined
 
