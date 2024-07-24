@@ -905,8 +905,11 @@ def days_in_year(year):
 def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=0, time_interval=1, reference_time = datetime(2000, 1, 1, 3, 0, 0)):
     t_nc_file_paths = get_file_list(data_FP, 'nc4', filter_strs=[doy_to_yearyyyymmdd(year, doy-1), doy_to_yearyyyymmdd(year, doy), doy_to_yearyyyymmdd(year, doy+1)])
     t_var_LT_combined = np.full((lon.shape), np.nan)
+
+    # Create a description for the tqdm progress bar
+    desc = f"{doy_to_yearyyyymmdd(year, doy)} at {target_local_time}±{time_interval} local time"
     
-    for i in tqdm(t_nc_file_paths, desc='Processing files', unit='file'):
+    for i in tqdm(t_nc_file_paths, desc=desc, unit='file'):
         t_var = get_variable_from_nc(i, var_name, layer_index=layer_index, flip_data='False')
         t_UTC_time = get_variable_from_nc(i, 'time', layer_index=0, flip_data='False')
         
@@ -921,7 +924,7 @@ def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=
     
         if t_selected_indices.size>0:
             t_var_LT_combined[:, t_selected_indices] = t_var[:, t_selected_indices]
-    print(doy_to_yearyyyymmdd(year, doy), 'at ', target_local_time ,'+-', str(time_interval),'local time.')
+    #print(doy_to_yearyyyymmdd(year, doy), 'at ', target_local_time ,'+-', str(time_interval),'local time.')
 
     return t_var_LT_combined
 
