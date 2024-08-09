@@ -552,3 +552,57 @@ def create_gif_from_maps(nc_paths, domain_lon, domain_lat, variable_name, output
     images[0].save(output_gif_path, save_all=True, append_images=images[1:], loop=0, duration=duration)
 
 
+def plot_kde_scatter(y_train_true, y_train_pred, y_test_true, y_test_pred):
+    """
+    This function creates a scatter plot to evaluate ML model performance with respect to train and test dataset.
+    """
+    def density_scatter(x, y, ax=None, sort=True, bins=20, **kwargs):
+        """
+        Scatter plot colored by 2d histogram
+        (This code is made by 'Guilaume' in stackoverflow community.
+        Ref. link: https://stackoverflow.com/questions/20105364/how-can-i-make-a-scatter-plot-colored-by-density/53865762#53865762)
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+        data, x_e, y_e = np.histogram2d(x, y, bins=bins, density=True)
+        z = interpn((0.5*(x_e[1:] + x_e[:-1]), 0.5*(y_e[1:]+y_e[:-1])), data, np.vstack([x,y]).T, method="splinef2d", bounds_error=False)
+
+        # To be sure to plot all data
+        z[np.where(np.isnan(z))] = 0.0
+
+        # Sort the points by density, so that the densest points are plotted last
+        if sort:
+            idx = z.argsort()
+            x, y, z = x[idx], y[idx], z[idx]
+
+        sc = ax.scatter(x, y, c=z, **kwargs)
+        norm = Normalize(vmin=np.min(z), vmax=np.max(z))
+        cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.viridis), ax=ax)
+
+        return ax
+
+    # Plotting training and test results with density scatter
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+
+    # Training results
+    density_scatter(y_train_true, y_train_pred, ax=axes[0], bins=[30, 30], cmap='viridis', label=f'MAE = {(np.mean(np.abs(y_train_true - y_train_pred))):.6f}')
+    axes[0].plot([y_train_true.min(), y_train_true.max()], [y_train_true.min(), y_train_true.max()], 'k--', lw=4)
+    axes[0].set_xlabel('Actual Values')
+    axes[0].set_ylabel('Predicted Values')
+    axes[0].set_title('Train Data')
+    axes[0].grid(True)
+    axes[0].legend(loc='upper left', fontsize=20)
+
+    # Test results
+    density_scatter(y_test_true, y_test_pred, ax=axes[1], bins=[30, 30], cmap='viridis', label=f'MAE = {(np.mean(np.abs(y_test_true - y_test_pred))):.6f}')
+    axes[1].plot([y_test_true.min(), y_test_true.max()], [y_test_true.min(), y_test_true.max()], 'k--', lw=4)
+    axes[1].set_xlabel('Actual Values')
+    axes[1].set_ylabel('Predicted Values')
+    axes[1].set_title('Test Data')
+    axes[1].grid(True)
+    axes[1].legend(loc='upper left', fontsize=20)
+
+    plt.tight_layout()
+    plt.show()
+
+
