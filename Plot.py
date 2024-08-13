@@ -176,6 +176,8 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
     cbar.set_label(label_title)
     im.set_clim(cmin, cmax)
+    cbar.locator = ticker.MaxNLocator(nbins=3) # set number of bins in colorbar
+    cbar.update_ticks()
 
     plt.show()
     
