@@ -11,6 +11,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib import cm
 from matplotlib.colors import Normalize 
 from scipy.interpolate import interpn
+import matplotlib.ticker as ticker
 
 import cartopy
 import cartopy.crs as ccrs
