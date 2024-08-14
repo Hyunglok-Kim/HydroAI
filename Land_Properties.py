@@ -4,7 +4,13 @@ import rasterio
 from rasterio.enums import Resampling
 from rasterio.warp import calculate_default_transform, reproject
 import rioxarray
+
+from tqdm import tqdm
+
 import os
+
+import HydroAI.Grid as hGrid
+import HydroAI.Data as hData
 
 # Define the majority filter function
 def majority_filter(data, size=3, nodata=-9999):
@@ -87,4 +93,45 @@ def copernicus(FP, input_file, dst_crs, resolution, output_FP=None):
     lat = lat_flat.reshape(y.shape)
 
     return rds, lon, lat
+
+# Land parameters from the SMAP anc data
+def SMAP_Land_Properties(data_fp, resolution, variables):
+    # Get lon/lat data for the selected resolution
+    or_lon, or_lat = hGrid.generate_lon_lat_e2grid(resolution)
+    
+    # Get file lists for float32 and uint8 files
+    smap_anc_list = hData.get_file_list(data_fp, 'float32', recursive=True, filter_strs=None)
+    smap_anc_list += hData.get_file_list(data_fp, 'uint8', recursive=True, filter_strs=None)
+    
+    data_dict = {}
+    
+    # Process each file in the list
+    for file_path in tqdm(smap_anc_list):
+        # Iterate over variables to check if "variable_resolution" is exactly in the file path
+        for var in variables:
+            term_to_match = f"{var}_{resolution}"
+            
+            # Check for exact match of "variable_resolution" in the file path
+            if term_to_match in file_path:
+                # Determine dtype based on file extension
+                if file_path.endswith('.float32'):
+                    dtype = np.float32
+                elif file_path.endswith('.uint8'):
+                    dtype = np.uint8
+                else:
+                    raise ValueError(f"Unknown file extension for {file_path}")
+                
+                # Read the data from the file
+                data = np.fromfile(file_path, dtype=dtype)
+                
+                # Create a key for the dictionary
+                dict_key = term_to_match
+                print(f"Processing {dict_key}")
+                
+                # Reshape and store the data in the dictionary
+                data_dict[var] = data.reshape(or_lon.shape)
+                
+                # Stop checking other variables for this file path (since it's already processed)
+                break
+    return or_lon, or_lat, data_dict
 
