@@ -5,11 +5,11 @@ from ease_lonlat import EASE2GRID
 def get_e2_grid(resolution_key):
     # Map both 'M36' and '36km' (or similar) to the corresponding grid parameters
     resolution_map = {
-        'M1': '1km', '1km': '1km',
-        'M3': '3km', '3km': '3km',
-        'M3.125': '3.125km', '3.125km': '3.125km',
-        'M6.25': '6.25km', '6.25km': '6.25km',
-        'M9': '9km', '9km': '9km',
+        'M01': '1km', '1km': '1km',
+        'M03': '3km', '3km': '3km',
+        'M03.125': '3.125km', '3.125km': '3.125km',
+        'M06.25': '6.25km', '6.25km': '6.25km',
+        'M09': '9km', '9km': '9km',
         'M12.5': '12.5km', '12.5km': '12.5km',
         'M25': '25km', '25km': '25km',
         'M36': '36km', '36km': '36km'
