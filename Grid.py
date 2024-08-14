@@ -3,6 +3,25 @@ from ease_lonlat import EASE2GRID
 
 ### EASE2 grid generator ###
 def get_e2_grid(resolution_key):
+    # Map both 'M36' and '36km' (or similar) to the corresponding grid parameters
+    resolution_map = {
+        'M1': '1km', '1km': '1km',
+        'M3': '3km', '3km': '3km',
+        'M3.125': '3.125km', '3.125km': '3.125km',
+        'M6.25': '6.25km', '6.25km': '6.25km',
+        'M9': '9km', '9km': '9km',
+        'M12.5': '12.5km', '12.5km': '12.5km',
+        'M25': '25km', '25km': '25km',
+        'M36': '36km', '36km': '36km'
+    }
+
+    # Translate the resolution_key to the corresponding key in e2_grid_params
+    grid_key = resolution_map.get(resolution_key)
+
+    if not grid_key:
+        raise ValueError(f"Unsupported resolution key: {resolution_key}")
+
+    # Dictionary with grid parameters
     e2_grid_params = {
         '1km': {'epsg': 6933, 'x_min': -17367530.44, 'y_max': 7314540.83, 'res': 1000.9, 'n_cols': 34704, 'n_rows': 14616},
         '3km': {'epsg': 6933, 'x_min': -17367530.44, 'y_max': 7314540.83, 'res': 3002.69, 'n_cols': 11568, 'n_rows': 4872},
@@ -13,12 +32,13 @@ def get_e2_grid(resolution_key):
         '25km': {'epsg': 6933, 'x_min': -17367530.44, 'y_max': 7307375.92, 'res': 25025.26, 'n_cols': 1388, 'n_rows': 584},
         '36km': {'epsg': 6933, 'x_min': -17367530.44, 'y_max': 7314540.83, 'res': 36032.22, 'n_cols': 964, 'n_rows': 406}
     }
-    # Prefer SUPPORTED_GRIDS if available
-    grid_params = e2_grid_params[resolution_key]
+
+    # Retrieve the grid parameters based on the mapped key
+    grid_params = e2_grid_params[grid_key]
 
     # Initialize the EASE2GRID with the specified parameters
     grid = EASE2GRID(
-        name=f'EASE2_G{resolution_key.replace("km", "")}',
+        name=f'EASE2_G{grid_key.replace("km", "")}',
         epsg=grid_params['epsg'],
         x_min=grid_params['x_min'],
         y_max=grid_params['y_max'],
