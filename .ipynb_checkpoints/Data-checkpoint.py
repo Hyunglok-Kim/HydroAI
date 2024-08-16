@@ -420,47 +420,64 @@ def is_uniform(array, axis):
         
 def find_closest_index(lon_2d, lat_2d, coord):
     """
-    Find the closest index in a 2D grid of longitude and latitude values to a given coordinate.
+    Find the closest indices in a 2D grid of longitude and latitude values to given coordinates.
 
     Parameters:
     lon_2d (np.ndarray): 2D array of longitude values.
     lat_2d (np.ndarray): 2D array of latitude values.
-    coord (tuple): A tuple containing the longitude and latitude of the target coordinate (lon_value, lat_value).
+    coords (tuple or np.ndarray): A tuple or 2D array containing the longitude and latitude 
+                                  of the target coordinates (lon_value, lat_value) or 
+                                  [(lon_value1, lat_value1), (lon_value2, lat_value2), ...].
 
     Returns:
-    tuple: A tuple containing the indices (lat_idx, lon_idx) of the closest grid point.
+    list of tuples: A list containing tuples of the indices (lat_idx, lon_idx) of the closest grid points.
 
     Explanation:
     The function first checks if the rows of `lon_2d` are uniform and the columns of `lat_2d` are uniform.
     If both conditions are met, it indicates that the grid is uniform, and the process speed is greatly increased
     due to direct indexing. If the grids are not uniform, the function uses a KDTree for nearest-neighbor search,
     which is computationally more intensive.
-
+    
     REVISION HISTORY: 
     2 June 2024 Hyunglok Kim; initial specification
+    16 Aug 2024 Hyunglok Kim; support for vectorization in uniform grids for more than one coords
     """
-    
-    lon_value, lat_value = coord
 
-    if np.all(is_uniform(lon_2d, 1)) and np.all(is_uniform(lat_2d, 0)):
-        # Case when lon_2d's rows are uniform and lat_2d's columns are uniform
-        lon_unique = lon_2d[0, :]
-        lat_unique = lat_2d[:, 0]
-        lon_idx = (np.abs(lon_unique - lon_value)).argmin()
-        lat_idx = (np.abs(lat_unique - lat_value)).argmin()
+    # Ensure coord is in the form of an array
+    if isinstance(coord, tuple):
+        lon_values = np.array([coord[0]])
+        lat_values = np.array([coord[1]])
     else:
-        # Case when lon_2d and lat_2d are not uniform
+        lon_values, lat_values = coord[:, 0], coord[:, 1]
+
+    if np.all(Data.is_uniform(lon_2d, axis=1)) and np.all(Data.is_uniform(lat_2d, axis=0)):
+        lon_start = lon_2d[0, 0]
+        lat_start = lat_2d[0, 0]
+        lon_step = lon_2d[0, 1] - lon_2d[0, 0]
+        lat_step = lat_2d[1, 0] - lat_2d[0, 0]
+        
+        lon_indices = np.round((lon_values - lon_start) / lon_step).astype(int)
+        lat_indices = np.round((lat_values - lat_start) / lat_step).astype(int)
+    
+    else:
         lon_flat = lon_2d.flatten()
         lat_flat = lat_2d.flatten()
-        
         coordinates = np.vstack((lon_flat, lat_flat)).T
         tree = cKDTree(coordinates)
-        
-        dist, idx = tree.query(coord)
-        lat_idx, lon_idx = np.unravel_index(idx, lon_2d.shape)
+        dists, idxs = tree.query(np.vstack((lon_values, lat_values)).T)
+        lat_indices, lon_indices = np.unravel_index(idxs, lon_2d.shape)
     
-    lat_idx, lon_idx = int(lat_idx), int(lon_idx)
-    return lat_idx, lon_idx
+    # If only one coordinate was provided, return the first (and only) index
+    if len(lon_indices) == 1:
+        return lon_indices[0], lat_indices[0]
+    else:
+        return lon_indices, lat_indices
+
+# Example usage:
+# lon_2d = np.array([...])  # Some 2D array of longitudes
+# lat_2d = np.array([...])  # Some 2D array of latitudes
+# coords = [(lon1, lat1), (lon2, lat2), ...]  # A list of coordinate tuples
+# indices = find_closest_index(lon_2d, lat_2d, coords)
 
     
 def extract_region_from_data(longitude, latitude, X, bounds):
