@@ -450,7 +450,7 @@ def find_closest_index(lon_2d, lat_2d, coord):
     else:
         lon_values, lat_values = coord[:, 0], coord[:, 1]
 
-    if np.all(Data.is_uniform(lon_2d, axis=1)) and np.all(Data.is_uniform(lat_2d, axis=0)):
+    if np.all(is_uniform(lon_2d, axis=1)) and np.all(is_uniform(lat_2d, axis=0)):
         lon_start = lon_2d[0, 0]
         lat_start = lat_2d[0, 0]
         lon_step = lon_2d[0, 1] - lon_2d[0, 0]
