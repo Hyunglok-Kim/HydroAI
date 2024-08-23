@@ -9,15 +9,31 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.mpl.gridliner as gridliner
 
-class SentinelBandReader:
-    def __init__(self, folder_path, product='S30'):
+class HLSBandReader:
+    def __init__(self, folder_path, product):
         self.product = product
         self.folder_path = folder_path
         self.scale_factor = 0.0001
+        self.scale_factor_tir = 0.01
         self.fill_value = -9999
         self.qa_fill_value = 255
         # Define the mapping of band nicknames to file names
-        if product == 'S30':
+        if product = 'L30'
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'nir': 'B05_merged_WGS84.tif',# Near infrared
+                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
+                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
+                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
+                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
+                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
+
+        elif product == 'S30':
             self.band_files = {
                 'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
                 'blue': 'B02_merged_WGS84.tif',     # Blue band
@@ -32,20 +48,6 @@ class SentinelBandReader:
                 'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
                 'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
                 'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
-                'qa': 'Fmask_merged_WGS84.tif'       # QA band
-            }
-        else: # product = 'L30'
-            self.band_files = {
-                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
-                'blue': 'B02_merged_WGS84.tif',     # Blue band
-                'green': 'B03_merged_WGS84.tif',    # Green band
-                'red': 'B04_merged_WGS84.tif',      # Red band
-                'nir': 'B05_merged_WGS84.tif',# Near infrared
-                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
-                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
-                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
-                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
-                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
                 'qa': 'Fmask_merged_WGS84.tif'       # QA band
             }
 
@@ -70,21 +72,34 @@ class SentinelBandReader:
         """Read and process a single band file."""
         path = f"{self.folder_path}/{band_file}"
 
-        mask_list = ['cirrus', 'coastal']
-        if self.product == 'S30': mask_list.append('water_vapor')
+        # Define TIR bands list in L30 (TIR bands have different scale factor)
+        tir_list = ['tir1', 'tir2']
 
         with rasterio.open(path) as src:
             band_data = src.read(1)
-            # Apply fill value and scaling factor for non-atmospheric correction bands
+            # Handle processing based on the product type
             if band_file == self.band_files['qa']:
-                # 'qa' differs from others due to its fill_value and not requiring scale_factor multiplication
                 processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
-            elif band_file not in [self.band_files[x] for x in mask_list]:
-                processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
-                processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
-            else:
-                processed_data = band_data
-        return processed_data
+
+            if self.product == 'L30':
+             # Apply fill value and scaling factor for non-atmospheric correction bands
+                if band_file == self.band_files['qa']:
+                    processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+                elif band_file in tir_list:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor_tir)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+                else:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+
+            elif self.product == 'S30':
+                # For S30, ignore TIR bands and process the rest
+                if band_file == self.band_files['qa']:
+                    processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+                else:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+            return processed_data 
 
     def get_lat_lon_arrays(self, band):
         """Generate latitude and longitude arrays for the specified band."""
@@ -112,22 +127,22 @@ class SentinelBandReader:
             raise AttributeError(f"No such band: {band}")
 #------------------------------------------------------#
 # Example usage:
-#s2_reader = SentinelBandReader(base_folder)
+#s30_reader = HLSBandReader(base_folder) -> or l30_reader = HLSBandReader(base_folder)
 
 # Access different bands
-#red_data = s2_reader.red  # Red band
-#nir_data = s2_reader.nir  # Near-infrared band
-#swir1_data = s2_reader.swir1  # Short-wave infrared 1
-#qa_data = s2_reader.qa  # QA band
+#red_data = s30_reader.red  # Red band
+#nir_data = s30_reader.nir  # Near-infrared band
+#swir1_data = s30_reader.swir1  # Short-wave infrared 1
+#qa_data = s30_reader.qa  # QA band
 
 # Other method
-#red_data = s2_reader['red'] # Red band by using __getitem__(self, key)
+#red_data = s30_reader['red'] # Red band by using __getitem__(self, key)
 
 #print("Red Band Data:")
 #print(red_data)
 #------------------------------------------------------#
 
-class SentinelBandPlotter:
+class HLSBandPlotter:
     def __init__(self, band_reader):
         self.band_reader = band_reader
 
@@ -157,7 +172,7 @@ class SentinelBandPlotter:
         plt.show()
 
     def plot_rgb(self, title=None):
-        # Standard band identifiers for Sentinel-2 RGB composite
+        # Standard band identifiers for HLS RGB composite
         red_band = 'red'
         green_band = 'green'
         blue_band = 'blue'
@@ -198,7 +213,7 @@ class SentinelBandPlotter:
 
     def plot_false_color(self, title=None):
 
-        # Standard band identifiers for Sentinel-2 RGB composite
+        # Standard band identifiers for HLS RGB composite
         red_band = 'red'
         green_band = 'green'
         nir_band = 'nir'
@@ -312,10 +327,10 @@ class SentinelBandPlotter:
         return norm_band
 #------------------------------------------------------#
 # Example usage 
-#s2_reader = SentinelBandReader(base_folder)
-#s2_plotter = SentinelBandPlotter(s2_reader)
-#s2_plotter.plot_band('red', 'jet', 'Red band')
-#s2_plotter.plot_rgb('RGB image')
+#s30_reader = HLSBandReader(base_folder) -> or l30_reader = HLSBandReader(base_folder)
+#s30_plotter = HLSBandPlotter(s30_reader)
+#s30_plotter.plot_band('red', 'jet', 'Red band')
+#s30_plotter.plot_rgb('RGB image')
 #------------------------------------------------------#
 
 class WaterIndicesCalculator:
@@ -336,14 +351,14 @@ class WaterIndicesCalculator:
         return mndwi, transform
 #------------------------------------------------------#
 # Example usage
-#s2_reader = SentinelBandReader(base_folder)
-#water_indices_calculator = WaterIndicesCalculator(s2_reader)
+#s30_reader = HLSBandReader(base_folder) -> or l30_reader = HLSBandReader(base_folder)
+#water_indices_calculator = WaterIndicesCalculator(s30_reader)
 #mndwi, transform = water_indices_calculator.calculate_mndwi()
 
-#s2_plotter = SentinelBandPlotter(s2_reader)
+#s30_plotter = HLSBandPlotter(s30_reader) -> or l30_plotter = HLSBandPlotter(l30_reader)
 #bounds = [38.895, 39.445, 21.445, 22.995]
-#s2_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
-#s2_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
+#s30_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
+#s30_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
 #------------------------------------------------------#
 
 #----- Sentinel QA -----#
