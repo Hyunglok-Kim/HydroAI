@@ -33,6 +33,7 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
     fMSE_xx_2d = np.copy(SNRdb_x_2d)
     fMSE_yy_2d = np.copy(SNRdb_y_2d)
     fMSE_zz_2d = np.copy(SNRdb_z_2d)
+    exitflag_2d = np.copy(VAR_err_x_2d)
 
     for i in range(index1.size):
         S1 = D1[index1[i], index2[i], :]
