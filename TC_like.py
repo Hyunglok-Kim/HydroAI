@@ -70,11 +70,16 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
         RR = np.corrcoef(np.column_stack((X, Y, Z)).T)
         values = RR[np.ix_([0, 1, 2], [0, 1, 2])]  # Corrected indexing
 
-        if L < nod_th or np.any(values < corr_th):
+        if L < nod_th:
             VAR_xerr = -1
             VAR_yerr = -1
             VAR_zerr = -1
-            exitflag = 0
+            exitflag = 1
+        elif np.any(values < corr_th):
+            VAR_xerr = -1
+            VAR_yerr = -1
+            VAR_zerr = -1
+            exitflag = 2
         else:
             c1 = 1
             c2 = (np.dot(X.T, Z) / np.dot(Y.T, Z)).item()
@@ -95,7 +100,7 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
             VAR_yerr = YY - XY * YZ / XZ
             VAR_zerr = ZZ - XZ * YZ / XY
 
-            exitflag = 1
+            exitflag = 0
 
         soln = [VAR_xerr, VAR_yerr, VAR_zerr]
 
@@ -170,10 +175,12 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
         fMSE_yy_2d[index1[i], index2[i]] = fMSE_y
         fMSE_zz_2d[index1[i], index2[i]] = fMSE_z
 
+        exitflag_2d[index1[i], index2[i]] = exitflag
+
     VAR_err = {'x': VAR_err_x_2d, 'y': VAR_err_y_2d, 'z': VAR_err_z_2d}
     SNR = {'x': SNR_x_2d, 'y': SNR_y_2d, 'z': SNR_z_2d}
     SNRdb = {'x': SNRdb_x_2d, 'y': SNRdb_y_2d, 'z': SNRdb_z_2d}
     R = {'x': R_xx_2d, 'y': R_yy_2d, 'z': R_zz_2d}
     fMSE = {'x': fMSE_xx_2d, 'y': fMSE_yy_2d, 'z': fMSE_zz_2d}
 
-    return VAR_err, SNR, SNRdb, R, fMSE
+    return VAR_err, SNR, SNRdb, R, fMSE, exitflag_2d

@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import tqdm
 import matplotlib.pyplot as plt
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
 # ML packages
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
@@ -13,6 +15,18 @@ import cuml
 from cuml.ensemble import RandomForestRegressor as cuRF
 from cuml.svm import SVR
 import lightgbm as lgb
+from cuml.linear_model import ElasticNet as cuML_ElasticNet
+
+
+
+def feature_engineering_XbyVIF(X_train):
+    vif = pd.DataFrame()
+    vif['VIF_Factor'] = [variance_inflation_factor(X_train.values, i) for i in range(X_train.shape[1])]
+    vif['Feature'] = X_train.columns
+    vif = vif.sort_values(by='VIF_Factor', ascending=False)
+    vif = vif.reset_index(drop=True)
+
+    return vif
 
 
 def create_feature_importance_df(X, y, n_estimators=100, seed=0, n_jobs=-1):
@@ -210,7 +224,7 @@ def Bayesian_optimization_LGBM(X_train, y_train, pbounds, n_iter=20, cv=10, seed
                                   learning_rate=learning_rate,
                                   n_estimators=round(n_estimators),
                                   random_state=seed,
-                                  #device='gpu',  # Enable GPU acceleration
+                                  device='cuda',  # Enable GPU acceleration
                                   n_jobs=-1,
                                   verbose=-1)  # Suppress warnings and messages
 
@@ -233,7 +247,7 @@ def Bayesian_optimization_LGBM(X_train, y_train, pbounds, n_iter=20, cv=10, seed
         'learning_rate': best_params['learning_rate'],
         'n_estimators': round(best_params['n_estimators']),
         'random_state': seed,
-        #'device': 'gpu'  # Ensure GPU acceleration is used
+        'device': 'cuda'  # Ensure GPU acceleration is used
     }
 
     print("Best model's target score:", target_score)
@@ -241,3 +255,49 @@ def Bayesian_optimization_LGBM(X_train, y_train, pbounds, n_iter=20, cv=10, seed
 
     return target_score, best_params_formatted
 
+
+def Bayesian_optimization_ElasticNet(X_train, y_train, pbounds, n_iter=20, cv=10, seed=0, scoring="neg_mean_squared_error", library_model="ElasticNet_cuml"):
+    """
+    Args:
+        X_train, y_train (array) : Train dataset for supervised learning
+        pbounds (dict)           : Bounds of alpha and l1_ratio
+        n_iter (int)             : Number of iteration to optimize (>2)
+        cv (int)                 : Number of cross validation
+        seed (int)               : Random seed for reproducibility
+        scoring (str)            : Scoring method
+    """
+    def ElasticNet_sklearn(alpha, l1_ratio):
+        print("Not yet supported ElasticNet_sklearn function")
+        exit(1)
+
+    def ElasticNet_cuml(alpha, l1_ratio):
+        model = cuML_ElasticNet(alpha=alpha, l1_ratio=l1_ratio)
+        model.fit(X_train, y_train)
+
+        # Perform cross-validation using cuML's cross_val_score
+        score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
+        return score
+
+    # Bayesian optimization
+    if library_model == 'ElasticNet_sklearn':
+        func = ElasticNet_sklearn
+    elif library_model == 'ElasticNet_cuml':
+        func = ElasticNet_cuml
+    else:
+        print(f'No supported library ML model: {library_model}')
+        exit(1)
+    bo = BayesianOptimization(f=func, pbounds=pbounds, verbose=2, random_state=seed)
+    bo.maximize(init_points=2, n_iter=n_iter-2)  # (init_points n_iter, additional n_iter)
+
+    # Read best model's score & parameter
+    target_score = bo.max['target']
+    best_params = bo.max['params']
+    best_params_formatted = {
+        'alpha': best_params['alpha'],
+        'l1_ratio': best_params['l1_ratio']
+    }
+
+    print("Best model's target score:", target_score)
+    print("Best model's parameter:", best_params_formatted)
+
+    return target_score, best_params_formatted

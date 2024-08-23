@@ -93,7 +93,7 @@ def plot_map_old(longitude, latitude, values, title, cmin, cmax, cmap='jet', bou
     
     return fig, ax
 
-def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None):
+def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, points=None):
     """
     Plots a map with the given data, either globally or within specified longitude and latitude bounds.
 
@@ -179,6 +179,14 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     im.set_clim(cmin, cmax)
     cbar.locator = ticker.MaxNLocator(nbins=3) # set number of bins in colorbar
     cbar.update_ticks()
+
+    # Mark the specified point if provided
+    if points:
+        for point in points:
+            pixel_y, pixel_x = point
+            lon = longitude[pixel_y, pixel_x]
+            lat = latitude[pixel_y, pixel_x]
+            ax.plot(lon, lat, marker='*', color='red', markersize=10, transform=ccrs.PlateCarree())
 
     plt.show()
     
