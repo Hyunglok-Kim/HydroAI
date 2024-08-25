@@ -194,8 +194,8 @@ def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
     # 2. Vectorized TC calculation
     # Scale the data
     c1 = 1
-    c2 = np.sum(X*Z, axis=2) / np.sum(Y*Z, axis=2)
-    c3 = np.sum(X*Y, axis=2) / np.sum(Z*Y, axis=2)
+    c2 = np.nansum(X*Z, axis=2) / np.nansum(Y*Z, axis=2)
+    c3 = np.nansum(X*Y, axis=2) / np.nansum(Z*Y, axis=2)
     
     Xs = c1 * X
     Ys = np.expand_dims(c2, axis=2) * Y
