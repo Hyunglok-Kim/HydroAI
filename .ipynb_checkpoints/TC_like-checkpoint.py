@@ -180,6 +180,13 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
     return VAR_err, SNR, SNRdb, R, fMSE
 
 def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
+
+    # 0. check the NaN and fill with NaN if any of X,Y, and Z value is nan.
+    combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
+    X[combined_nan_mask] = np.nan
+    Y[combined_nan_mask] = np.nan
+    Z[combined_nan_mask] = np.nan
+    
     # 1. calculation for the originial data
     # Calculate covariance
     cov_corr_results = hVec.cov_corr_three(X, Y, Z)
