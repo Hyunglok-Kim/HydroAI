@@ -1,4 +1,9 @@
+import os
+import sys
+import platform
+import importlib
 import rasterio
+from rasterio.warp import reproject, Resampling
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.ticker as mticker
@@ -9,15 +14,31 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.mpl.gridliner as gridliner
 
-class SentinelBandReader:
-    def __init__(self, folder_path, product='S30'):
+class BandReader:
+    def __init__(self, folder_path, product):
         self.product = product
         self.folder_path = folder_path
         self.scale_factor = 0.0001
+        self.scale_factor_tir = 0.01
         self.fill_value = -9999
         self.qa_fill_value = 255
         # Define the mapping of band nicknames to file names
-        if product == 'S30':
+        if product == 'L30':
+            self.band_files = {
+                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
+                'blue': 'B02_merged_WGS84.tif',     # Blue band
+                'green': 'B03_merged_WGS84.tif',    # Green band
+                'red': 'B04_merged_WGS84.tif',      # Red band
+                'nir': 'B05_merged_WGS84.tif',# Near infrared
+                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
+                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
+                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
+                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
+                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
+                'qa': 'Fmask_merged_WGS84.tif'       # QA band
+            }
+
+        elif product == 'S30':
             self.band_files = {
                 'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
                 'blue': 'B02_merged_WGS84.tif',     # Blue band
@@ -32,20 +53,6 @@ class SentinelBandReader:
                 'cirrus': 'B10_merged_WGS84.tif',   # Cirrus
                 'swir1': 'B11_merged_WGS84.tif',    # Short-wave infrared 1
                 'swir2': 'B12_merged_WGS84.tif',    # Short-wave infrared 2
-                'qa': 'Fmask_merged_WGS84.tif'       # QA band
-            }
-        else: # product = 'L30'
-            self.band_files = {
-                'coastal': 'B01_merged_WGS84.tif',  # Coastal/aerosol band
-                'blue': 'B02_merged_WGS84.tif',     # Blue band
-                'green': 'B03_merged_WGS84.tif',    # Green band
-                'red': 'B04_merged_WGS84.tif',      # Red band
-                'nir': 'B05_merged_WGS84.tif',# Near infrared
-                'swir1': 'B06_merged_WGS84.tif',#  Short-wave infrared 1
-                'swir2': 'B07_merged_WGS84.tif',# Short-wave infrared 2
-                'cirrus': 'B09_merged_WGS84.tif', # Cirrus
-                'tir1': 'B10_merged_WGS84.tif',   # Thermal Infrared 1
-                'tir2': 'B11_merged_WGS84.tif',    # Thermal Infrared 2
                 'qa': 'Fmask_merged_WGS84.tif'       # QA band
             }
 
@@ -64,27 +71,40 @@ class SentinelBandReader:
             if band not in ['water_vapor', 'cirrus', 'coastal', 'qa']:
                 data = np.where(data == self.fill_value, np.nan, data * self.scale_factor)
                 data = np.where((data < 0) | (data > 1), np.nan, data)
-            return data, src.transform
+            return data, src.transform, src.crs
             
     def _read_band(self, band_file):
         """Read and process a single band file."""
         path = f"{self.folder_path}/{band_file}"
 
-        mask_list = ['cirrus', 'coastal']
-        if self.product == 'S30': mask_list.append('water_vapor')
+        # Define TIR bands list in L30 (TIR bands have different scale factor)
+        tir_list = ['tir1', 'tir2']
 
         with rasterio.open(path) as src:
             band_data = src.read(1)
-            # Apply fill value and scaling factor for non-atmospheric correction bands
+            # Handle processing based on the product type
             if band_file == self.band_files['qa']:
-                # 'qa' differs from others due to its fill_value and not requiring scale_factor multiplication
                 processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
-            elif band_file not in [self.band_files[x] for x in mask_list]:
-                processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
-                processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
-            else:
-                processed_data = band_data
-        return processed_data
+
+            if self.product == 'L30':
+             # Apply fill value and scaling factor for non-atmospheric correction bands
+                if band_file == self.band_files['qa']:
+                    processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+                elif band_file in tir_list:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor_tir)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+                else:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+
+            elif self.product == 'S30':
+                # For S30, ignore TIR bands and process the rest
+                if band_file == self.band_files['qa']:
+                    processed_data = np.where(band_data == self.qa_fill_value, np.nan, band_data)
+                else:
+                    processed_data = np.where(band_data == self.fill_value, np.nan, band_data * self.scale_factor)
+                    processed_data = np.where((processed_data < 0) | (processed_data > 1), np.nan, processed_data)
+            return processed_data 
 
     def get_lat_lon_arrays(self, band):
         """Generate latitude and longitude arrays for the specified band."""
@@ -112,27 +132,28 @@ class SentinelBandReader:
             raise AttributeError(f"No such band: {band}")
 #------------------------------------------------------#
 # Example usage:
-#s2_reader = SentinelBandReader(base_folder)
+#s30_reader = BandReader(base_folder) -> or l30_reader = BandReader(base_folder)
 
 # Access different bands
-#red_data = s2_reader.red  # Red band
-#nir_data = s2_reader.nir  # Near-infrared band
-#swir1_data = s2_reader.swir1  # Short-wave infrared 1
-#qa_data = s2_reader.qa  # QA band
+#red_data = s30_reader.red  # Red band
+#nir_data = s30_reader.nir  # Near-infrared band
+#swir1_data = s30_reader.swir1  # Short-wave infrared 1
+#qa_data = s30_reader.qa  # QA band
 
 # Other method
-#red_data = s2_reader['red'] # Red band by using __getitem__(self, key)
+#red_data = s30_reader['red'] # Red band by using __getitem__(self, key)
 
 #print("Red Band Data:")
 #print(red_data)
 #------------------------------------------------------#
 
-class SentinelBandPlotter:
+class BandPlotter:
     def __init__(self, band_reader):
         self.band_reader = band_reader
+        self.band_files = band_reader.band_files
 
     def plot_band(self, band, cmap='gray', title=None):
-        data, transform = self.band_reader.get_band_with_transform(band)
+        data, transform, src = self.band_reader.get_band_with_transform(band)
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
         
         height, width = data.shape
@@ -156,34 +177,73 @@ class SentinelBandPlotter:
             plt.title(title)
         plt.show()
 
-    def plot_rgb(self, title=None):
-        # Standard band identifiers for Sentinel-2 RGB composite
+    def plot_rgb(self, title=None, bounds=None):
+        # Standard band identifiers for HLS RGB composite
         red_band = 'red'
         green_band = 'green'
         blue_band = 'blue'
-
+    
         # Retrieve data and transforms for each band
-        red, transform = self.band_reader.get_band_with_transform(red_band)
-        green, _ = self.band_reader.get_band_with_transform(green_band)
-        blue, _ = self.band_reader.get_band_with_transform(blue_band)
-        
+        red, red_transform, red_crs = self.band_reader.get_band_with_transform(red_band)
+        green, green_transform, green_crs = self.band_reader.get_band_with_transform(green_band)
+        blue, blue_transform, blue_crs = self.band_reader.get_band_with_transform(blue_band)
+            
         # Normalize each band data to [0, 1] range
         red_normalized = self._normalize_band(red)
         green_normalized = self._normalize_band(green)
         blue_normalized = self._normalize_band(blue)
-        
-        # Stack bands into an RGB image
-        rgb = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
-        
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+            
+        # Check if the shapes of the arrays are the same
+        if red_normalized.shape == green_normalized.shape == blue_normalized.shape:
+            # Stack aligned bands into an RGB image
+            rgb = np.stack([red_normalized, green_normalized, blue_normalized], axis=-1)
+        else:
+            # Reproject green and blue bands to match the red band's transform and shape
+            green_aligned = np.empty_like(red_normalized, dtype='float32')
+            blue_aligned = np.empty_like(red_normalized, dtype='float32')
+    
+            reproject(
+                source=green_normalized,
+                destination=green_aligned,
+                src_transform=green_transform,
+                dst_transform=red_transform,
+                src_crs=green_crs,
+                dst_crs=red_crs,
+                resampling=Resampling.nearest
+            )
+    
+            reproject(
+                source=blue_normalized,
+                destination=blue_aligned,
+                src_transform=blue_transform,
+                dst_transform=red_transform,
+                src_crs=blue_crs,
+                dst_crs=red_crs,
+                resampling=Resampling.nearest
+            )
+            
+            # Stack aligned bands into an RGB image
+            rgb = np.stack([red_normalized, green_aligned, blue_aligned], axis=-1)
+
+        # Apply gamma correction to the RGB image 
+        gamma=0.4
+        rgb = np.power(rgb, gamma)
+    
+        # Calculate the extent using the transform
         height, width = red.shape
-        west, north = transform * (0, 0)
-        east, south = transform * (width, height)
+        west, north = red_transform * (0, 0)
+        east, south = red_transform * (width, height)
         extent = [west, east, south, north]
-        
+    
+        # Plot RGB image with geographical context
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
         ax.imshow(rgb, extent=extent, origin='upper')
         ax.add_feature(cfeature.COASTLINE)
-
+    
+        # Set the extent if bounds are provided
+        if bounds:
+            ax.set_extent(bounds, crs=ccrs.PlateCarree())
+    
         gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
         gl.top_labels = False
         gl.right_labels = False
@@ -191,45 +251,83 @@ class SentinelBandPlotter:
         gl.yformatter = gridliner.LATITUDE_FORMATTER
         gl.xlabel_style = {'size': 15, 'color': 'black'}
         gl.ylabel_style = {'size': 15, 'color': 'black'}
-        
+            
         if title:
             plt.title(title)
         plt.show()
 
-    def plot_false_color(self, title=None):
+    def plot_false_color(self, title=None, bounds=None):
 
-        # Standard band identifiers for Sentinel-2 RGB composite
+        # Standard band identifiers for HLS RGB composite
         red_band = 'red'
         green_band = 'green'
         nir_band = 'nir'
 
         # Retrieve data and transforms for each band
-        red, transform = self.band_reader.get_band_with_transform(red_band)
-        green, _ = self.band_reader.get_band_with_transform(green_band)
-        nir, _ = self.band_reader.get_band_with_transform(nir_band)
+        red, red_transform, red_crs = self.band_reader.get_band_with_transform(red_band)
+        green, green_transform, green_crs = self.band_reader.get_band_with_transform(green_band)
+        nir, nir_transform, nir_crs = self.band_reader.get_band_with_transform(nir_band)
 
         # Replace NaNs with zero and infinite values with finite maximums of each array
-        nir = np.nan_to_num(nir, nan=0, posinf=np.nanmax(nir[np.isfinite(nir)]), neginf=0)
         red = np.nan_to_num(red, nan=0, posinf=np.nanmax(red[np.isfinite(red)]), neginf=0)
         green = np.nan_to_num(green, nan=0, posinf=np.nanmax(green[np.isfinite(green)]), neginf=0)
+        nir = np.nan_to_num(nir, nan=0, posinf=np.nanmax(nir[np.isfinite(nir)]), neginf=0)
 
-        # Normalize each band data to [0, 1] range
-        false_color_image = np.stack((nir, red, green), axis=-1)
+        # Check if all bands have the same shape
+        if red.shape == green.shape == nir.shape:
+            # If shapes are the same, directly stack the bands
+            false_color_image = np.stack([nir, red, green], axis=-1)
+        else:
+            # Reproject green and NIR bands to match the red band's transform and shape
+            green_aligned = np.empty_like(red, dtype='float32')
+            nir_aligned = np.empty_like(red, dtype='float32')
+        
+            reproject(
+                source=green,
+                destination=green_aligned,
+                src_transform=green_transform,
+                dst_transform=red_transform,
+                src_crs=green_crs,  # Coordinate reference system
+                dst_crs=red_crs,
+                resampling=Resampling.nearest  # Use nearest neighbor resampling
+            )
+        
+            reproject(
+                source=nir,
+                destination=nir_aligned,
+                src_transform=nir_transform,
+                dst_transform=red_transform,
+                src_crs=nir_crs,
+                dst_crs=red_crs,
+                resampling=Resampling.nearest
+            )
+        
+            # Stack the aligned bands to form an RGB image
+            false_color_image = np.stack([nir_aligned, red, green_aligned], axis=-1)
+
         # Scale the data to [0, 1] if not already scaled
         # Normalize the data to [0, 1] if not already normalized
+        
+        # Normalize the image if max value > 1
         max_value = np.max(false_color_image)
         if max_value > 1:
             false_color_image = false_color_image / max_value
     
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+        # Calculate the extent using the transform 
         height, width = red.shape
-        west, north = transform * (0, 0)
-        east, south = transform * (width, height)
+        west, north = red_transform * (0, 0)
+        east, south = red_transform * (width, height)
         extent = [west, east, south, north]
-        
+    
+        # Plot the false-color image with geographical context
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
         ax.imshow(false_color_image, extent=extent, origin='upper')
         ax.add_feature(cfeature.COASTLINE)
-
+        
+        # Set the extent if bounds are provided
+        if bounds:
+            ax.set_extent(bounds, crs=ccrs.PlateCarree())
+    
         gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
         gl.top_labels = False
         gl.right_labels = False
@@ -237,7 +335,7 @@ class SentinelBandPlotter:
         gl.yformatter = gridliner.LATITUDE_FORMATTER
         gl.xlabel_style = {'size': 15, 'color': 'black'}
         gl.ylabel_style = {'size': 15, 'color': 'black'}
-        
+    
         if title:
             plt.title(title)
         plt.show()
@@ -312,10 +410,10 @@ class SentinelBandPlotter:
         return norm_band
 #------------------------------------------------------#
 # Example usage 
-#s2_reader = SentinelBandReader(base_folder)
-#s2_plotter = SentinelBandPlotter(s2_reader)
-#s2_plotter.plot_band('red', 'jet', 'Red band')
-#s2_plotter.plot_rgb('RGB image')
+#s30_reader = BandReader(base_folder) -> or l30_reader = BandReader(base_folder)
+#s30_plotter = BandPlotter(s30_reader)
+#s30_plotter.plot_band('red', 'jet', 'Red band')
+#s30_plotter.plot_rgb('RGB image')
 #------------------------------------------------------#
 
 class WaterIndicesCalculator:
@@ -324,26 +422,47 @@ class WaterIndicesCalculator:
 
     def calculate_mndwi(self):
         """Calculate Modified Normalized Difference Water Index (MNDWI)."""
-        green, transform = self.band_reader.get_band_with_transform('green')
-        swir1, _ = self.band_reader.get_band_with_transform('swir1')
+        green, green_transform, green_crs = self.band_reader.get_band_with_transform('green')
+        swir1, swir1_transform, swir1_crs = self.band_reader.get_band_with_transform('swir1')
+
+        # Check if the shapes of the arrays are the same
+        if green.shape == swir1.shape:
+            # If shapes are the same, calculate MNDWI directly
+            denominator = green + swir1
+            with np.errstate(divide='ignore', invalid='ignore'):
+                mndwi = (green - swir1) / denominator
+                mndwi[denominator == 0] = np.nan  # Explicitly set where denominator is zero to NaN
+        else:
+            # Reproject SWIR1 band to match the green band's transform and shape
+            swir1_aligned = np.empty_like(green, dtype='float32')
+
+            reproject(
+                source=swir1,
+                destination=swir1_aligned,
+                src_transform=swir1_transform,
+                dst_transform=green_transform,
+                src_crs=swir1_crs,
+                dst_crs=green_crs,
+                resampling=Resampling.nearest
+            )
+            
+            # Calculate MNDWI
+            denominator = green + swir1_aligned
+            with np.errstate(divide='ignore', invalid='ignore'):
+                mndwi = (green - swir1_aligned) / denominator
+                mndwi[denominator == 0] = np.nan  # Explicitly set where denominator is zero to NaN
         
-        # Set MNDWI values to NaN where denominator is zero or close to zero
-        denominator = green + swir1
-        with np.errstate(divide='ignore', invalid='ignore'):
-            mndwi = (green - swir1) / denominator
-            mndwi[denominator == 0] = np.nan  # Explicitly set where denominator is zero to NaN
-    
-        return mndwi, transform
+        return mndwi, green_transform
 #------------------------------------------------------#
 # Example usage
-#s2_reader = SentinelBandReader(base_folder)
-#water_indices_calculator = WaterIndicesCalculator(s2_reader)
+#s30_reader = BandReader(base_folder) -> or l30_reader = BandReader(base_folder)
+#water_indices_calculator = WaterIndicesCalculator(s30_reader)
 #mndwi, transform = water_indices_calculator.calculate_mndwi()
 
-#s2_plotter = SentinelBandPlotter(s2_reader)
+#s30_plotter = BandPlotter(s30_reader) -> or l30_plotter = BandPlotter(l30_reader)
 #bounds = [38.895, 39.445, 21.445, 22.995]
-#s2_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
-#s2_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
+#s30_plotter.plot_index(mndwi, transform, threshold=0, title='Modified Normalized Difference Water Index (MNDWI)', bounds = bounds)
+#s30_plotter.plot_index(mndwi, transform, title='Modified Normalized Difference Water Index (MNDWI)', cmap='jet_r', bounds = bounds)
 #------------------------------------------------------#
 
 #----- Sentinel QA -----#
