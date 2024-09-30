@@ -119,11 +119,11 @@ def Bayesian_optimization_RF(X_train, y_train, pbounds, n_iter=20, cv=10, seed=0
 
 
 def Bayesian_optimization_XGB(X_train, y_train, pbounds, n_iter=20, cv=10, seed=0):
-    def XGB(n_estimators, max_features, max_depth, min_samples_split):
+    def XGB(n_estimators, colsample_bytree, max_depth, min_child_weight):
         model = xgb.XGBRegressor(n_estimators=round(n_estimators),
+                                 colsample_bytree=colsample_bytree,
                                  max_depth=round(max_depth),
-                                 min_child_weight=round(min_samples_split),
-                                 colsample_bytree=max_features,
+                                 min_child_weight=round(min_child_weight),
                                  tree_method='hist', # specifies the histogram-based algorithm for faster training
                                  objective='reg:squarederror', # regression objective function
                                  device='cuda', # specifies that the model should use a GPU for training
@@ -142,9 +142,9 @@ def Bayesian_optimization_XGB(X_train, y_train, pbounds, n_iter=20, cv=10, seed=
     best_params = bo.max['params']
     best_params_formatted = {
                         'n_estimators': round(best_params['n_estimators']),
+                        'colsample_bytree': best_params['colsample_bytree'],
                         'max_depth': round(best_params['max_depth']),
-                        'min_child_weight': round(best_params['min_samples_split']),
-                        'colsample_bytree': best_params['max_features'],
+                        'min_child_weight': round(best_params['min_child_weight']),
                         'tree_method': 'hist',
                         'objective': 'reg:squarederror',
                         'device': 'cuda',
