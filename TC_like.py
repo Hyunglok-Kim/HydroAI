@@ -179,7 +179,7 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
 
     return VAR_err, SNR, SNRdb, R, fMSE
 
-def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
+def TCA_vec_old(X, Y, Z, nod_th=30, corr_th=0):
 
     # 0. check the NaN and fill with NaN if any of X,Y, and Z value is nan.
     combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
@@ -265,6 +265,262 @@ def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
     condition_negative_vars_err  = (var_Xserr < 0) | (var_Yserr < 0) | (var_Zserr < 0) #flag 4
     
     flags = {'condition_corr': condition_corr, 
+            'condition_n_valid': condition_n_valid,
+            'condition_fMSE': condition_fMSE,
+            'condition_negative_vars_err': condition_negative_vars_err}
+
+    return VAR_err, SNR, SNRdb, R, fMSE, flags
+
+def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
+    # 0. Check for NaNs and ensure that any NaNs are consistent across datasets
+    combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
+    X[combined_nan_mask] = np.nan
+    Y[combined_nan_mask] = np.nan
+    Z[combined_nan_mask] = np.nan
+
+    # Remove completely NaN slices (if data is 3D)
+    valid_mask = ~np.isnan(X).all(axis=2) & ~np.isnan(Y).all(axis=2) & ~np.isnan(Z).all(axis=2)
+    X = X[valid_mask]
+    Y = Y[valid_mask]
+    Z = Z[valid_mask]
+
+    # 1. Flatten the data to 2D arrays if necessary
+    X_flat = X.reshape(-1, X.shape[-1])
+    Y_flat = Y.reshape(-1, Y.shape[-1])
+    Z_flat = Z.reshape(-1, Z.shape[-1])
+
+    # Remove rows with NaNs
+    valid_rows = ~np.isnan(X_flat).any(axis=1) & ~np.isnan(Y_flat).any(axis=1) & ~np.isnan(Z_flat).any(axis=1)
+    X_flat = X_flat[valid_rows]
+    Y_flat = Y_flat[valid_rows]
+    Z_flat = Z_flat[valid_rows]
+
+    # Combine the data into a single array
+    data = np.stack((X_flat, Y_flat, Z_flat), axis=1)  # Shape: (N, 3, T)
+
+    # Initialize arrays to store results
+    N = data.shape[0]
+    errVar_ETC = np.zeros((N, 3))
+    rho2_ETC = np.zeros((N, 3))
+    SNR = np.zeros((N, 3))
+    SNRdb = np.zeros((N, 3))
+
+    # Iterate over each time series (row)
+    for i in range(N):
+        y = data[i, :, :].T  # Shape: (T, 3)
+
+        # Check that there are enough valid observations
+        if y.shape[0] < nod_th:
+            continue  # Skip if not enough data
+
+        # Remove any remaining NaNs
+        if np.isnan(y).any():
+            continue  # Skip if there are NaNs
+
+        # Compute covariance matrix
+        Q_hat = np.cov(y, rowvar=False)
+
+        # Ensure covariance matrix is full rank
+        if np.linalg.matrix_rank(Q_hat) < 3:
+            continue  # Skip if covariance matrix is singular
+
+        # Calculate correlation coefficients
+        try:
+            rho_ETC = np.zeros(3)
+            rho_ETC[0] = np.sqrt(Q_hat[0,1]*Q_hat[0,2]/(Q_hat[0,0]*Q_hat[1,2]))
+            rho_ETC[1] = np.sign(Q_hat[0,2]*Q_hat[1,2]) * np.sqrt(Q_hat[0,1]*Q_hat[1,2]/(Q_hat[1,1]*Q_hat[0,2]))
+            rho_ETC[2] = np.sign(Q_hat[0,1]*Q_hat[1,2]) * np.sqrt(Q_hat[0,2]*Q_hat[1,2]/(Q_hat[2,2]*Q_hat[0,1]))
+
+            rho2_ETC[i, :] = rho_ETC**2
+
+            # Calculate error variances
+            errVar_ETC[i, 0] = Q_hat[0,0] - Q_hat[0,1]*Q_hat[0,2]/Q_hat[1,2]
+            errVar_ETC[i, 1] = Q_hat[1,1] - Q_hat[0,1]*Q_hat[1,2]/Q_hat[0,2]
+            errVar_ETC[i, 2] = Q_hat[2,2] - Q_hat[0,2]*Q_hat[1,2]/Q_hat[0,1]
+
+            # Calculate SNR
+            SNR[i, :] = (rho2_ETC[i, :]) / (1 - rho2_ETC[i, :])
+
+            # Calculate SNR in dB
+            SNRdb[i, :] = 10 * np.log10(SNR[i, :])
+
+        except Exception as e:
+            # Handle any mathematical errors (e.g., division by zero)
+            continue
+
+    # Prepare outputs
+    VAR_err = {
+        'x': errVar_ETC[:, 0],
+        'y': errVar_ETC[:, 1],
+        'z': errVar_ETC[:, 2]
+    }
+    SNR = {
+        'x': SNR[:, 0],
+        'y': SNR[:, 1],
+        'z': SNR[:, 2]
+    }
+    SNRdb = {
+        'x': SNRdb[:, 0],
+        'y': SNRdb[:, 1],
+        'z': SNRdb[:, 2]
+    }
+    R = {
+        'x': rho2_ETC[:, 0],
+        'y': rho2_ETC[:, 1],
+        'z': rho2_ETC[:, 2]
+    }
+    fMSE = {
+        'x': 1 - rho2_ETC[:, 0],
+        'y': 1 - rho2_ETC[:, 1],
+        'z': 1 - rho2_ETC[:, 2]
+    }
+
+    # 3. Set the flags
+    # Flag on non-scaled data (not necessary here as we didn't calculate corrXY)
+    # flags on correlation coefficients
+    condition_corr = (R['x'] < corr_th) | (R['y'] < corr_th) | (R['z'] < corr_th)  # flag 1
+    # flag on valid number of observations
+    condition_n_valid = np.sum(~np.isnan(X_flat) & ~np.isnan(Y_flat) & ~np.isnan(Z_flat), axis=1) < nod_th
+    # flags on fMSE
+    condition_fMSE = (fMSE['x'] < 0) | (fMSE['y'] < 0) | (fMSE['z'] < 0) | (fMSE['x'] > 1) | (fMSE['y'] > 1) | (fMSE['z'] > 1)  # flag 3
+    # flag on negative error variances
+    condition_negative_vars_err = (errVar_ETC < 0).any(axis=1)  # flag 4
+
+    flags = {'condition_corr': condition_corr,
+            'condition_n_valid': condition_n_valid,
+            'condition_fMSE': condition_fMSE,
+            'condition_negative_vars_err': condition_negative_vars_err}
+
+    return VAR_err, SNR, SNRdb, R, fMSE, flags
+
+def ETC(D1, D2, D3, nod_th=30, corr_th=0):
+    """
+    Extended Triple Collocation (ETC) is a technique for estimating the
+    variance of the noise error (errVar) and correlation coefficients (rho)
+    of three measurement systems (e.g., satellite, in-situ, and model-based products)
+    with respect to the unknown true value of the variable being measured
+    (e.g., soil moisture, wind speed).
+
+    INPUTS
+    D1, D2, D3: Arrays of observations from the three measurement systems.
+    They must be of the same length, and all NaNs must be removed or handled appropriately.
+
+    OUTPUTS
+    errVar_ETC: A list of error variances [errVar_D1, errVar_D2, errVar_D3].
+    rho2_ETC: A list of squared correlation coefficients [rho2_D1, rho2_D2, rho2_D3].
+
+    REFERENCE
+    McColl, K.A., J. Vogelzang, A.G. Konings, D. Entekhabi, M. Piles, A. Stoffelen (2014).
+    Extended Triple Collocation: Estimating errors and correlation coefficients with respect
+    to an unknown target. Geophysical Research Letters 41:6229-6236.
+    """
+
+    # Convert inputs to numpy arrays
+    D1 = np.asarray(D1)
+    D2 = np.asarray(D2)
+    D3 = np.asarray(D3)
+
+    # Check that all inputs have the same length
+    if not (len(D1) == len(D2) == len(D3)):
+        raise ValueError('Error: Input data D1, D2, D3 must be of the same length.')
+
+    # Combine the data into a single array
+    y = np.column_stack((D1, D2, D3))  # Shape: (N, 3)
+
+    # Remove any rows with NaNs
+    if np.isnan(y).any():
+        y = y[~np.isnan(y).any(axis=1)]
+
+    # Catch errors in inputs
+    if y.shape[1] != 3:
+        raise ValueError('Error: Input data must result in an N x 3 array after removing NaNs.')
+
+    if y.size == 0:
+        raise ValueError('Error: No data left after removing NaNs.')
+
+    # Check that each column has non-zero variance
+    if np.var(y[:, 0]) == 0 or np.var(y[:, 1]) == 0 or np.var(y[:, 2]) == 0:
+        raise ValueError('Error: The sample variance of each dataset must be non-zero.')
+
+    # Estimate covariance matrix of the three measurement systems
+    Q_hat = np.cov(y, rowvar=False)
+
+    # Compute correlation coefficients
+    rho_ETC = np.zeros(3)
+
+    try:
+        rho_ETC[0] = np.sqrt(Q_hat[0, 1] * Q_hat[0, 2] / (Q_hat[0, 0] * Q_hat[1, 2]))
+        rho_ETC[1] = np.sign(Q_hat[0, 2] * Q_hat[1, 2]) * np.sqrt(Q_hat[0, 1] * Q_hat[1, 2] / (Q_hat[1, 1] * Q_hat[0, 2]))
+        rho_ETC[2] = np.sign(Q_hat[0, 1] * Q_hat[1, 2]) * np.sqrt(Q_hat[0, 2] * Q_hat[1, 2] / (Q_hat[2, 2] * Q_hat[0, 1]))
+    except (ZeroDivisionError, FloatingPointError, ValueError):
+        raise ValueError('Error: Calculation of correlation coefficients failed due to invalid covariance values.')
+
+    rho2_ETC = rho_ETC ** 2
+
+    # Compute error variances
+    errVar_ETC = np.zeros(3)
+    errVar_ETC[0] = Q_hat[0, 0] - (Q_hat[0, 1] * Q_hat[0, 2]) / Q_hat[1, 2]
+    errVar_ETC[1] = Q_hat[1, 1] - (Q_hat[0, 1] * Q_hat[1, 2]) / Q_hat[0, 2]
+    errVar_ETC[2] = Q_hat[2, 2] - (Q_hat[0, 2] * Q_hat[1, 2]) / Q_hat[0, 1]
+
+    # Check for negative error variances
+    if np.any(errVar_ETC < 0):
+        print('Warning: At least one calculated errVar is negative. This can happen if the sample size is too small or if one of the assumptions of ETC is violated.')
+
+    # Check for negative squared correlation coefficients
+    if np.any(rho2_ETC < 0):
+        print('Warning: At least one calculated squared correlation coefficient is negative. This can happen if the sample size is too small or if one of the assumptions of ETC is violated.')
+
+    # ======================================================
+    # Computer SNR
+    SNR = np.zeros(3)
+    SNRdb = np.zeros(3)
+
+    SNR[0] = (rho2_ETC[0]) / (1 - rho2_ETC[0])
+    SNRdb[0] = 10 * np.log10(SNR[0])
+    SNR[1] = (rho2_ETC[1]) / (1 - rho2_ETC[1])
+    SNRdb[1] = 10 * np.log10(SNR[1])
+    SNR[2] = (rho2_ETC[2]) / (1 - rho2_ETC[2])
+    SNRdb[2] = 10 * np.log10(SNR[2])
+
+    # Prepare outputs
+    VAR_err = {
+        'x': errVar_ETC[0],
+        'y': errVar_ETC[1],
+        'z': errVar_ETC[2]
+    }
+    SNR = {
+        'x': SNR[0],
+        'y': SNR[1],
+        'z': SNR[2]
+    }
+    SNRdb = {
+        'x': SNRdb[0],
+        'y': SNRdb[1],
+        'z': SNRdb[2]
+    }
+    R = {
+        'x': rho2_ETC[0],
+        'y': rho2_ETC[1],
+        'z': rho2_ETC[2]
+    }
+    fMSE = {
+        'x': 1 - rho2_ETC[0],
+        'y': 1 - rho2_ETC[1],
+        'z': 1 - rho2_ETC[2]
+    }
+    # Set the flags
+    # Flag on non-scaled data (not necessary here as we didn't calculate corrXY)
+    # flags on correlation coefficients
+    condition_corr = (R['x'] < corr_th) | (R['y'] < corr_th) | (R['z'] < corr_th)  # flag 1
+    # flag on valid number of observations
+    condition_n_valid = np.sum(~np.isnan(D1) & ~np.isnan(D2) & ~np.isnan(D3), axis=0) < nod_th # flag 2 (axis=0 is due to 1D array
+    # flags on fMSE
+    condition_fMSE = (fMSE['x'] < 0) | (fMSE['y'] < 0) | (fMSE['z'] < 0) | (fMSE['x'] > 1) | (fMSE['y'] > 1) | (fMSE['z'] > 1)  # flag 3
+    # flag on negative error variances
+    condition_negative_vars_err = (errVar_ETC < 0).any(axis=0)  # flag 4 (axis=0 is due to 1D array)
+
+    flags = {'condition_corr': condition_corr,
             'condition_n_valid': condition_n_valid,
             'condition_fMSE': condition_fMSE,
             'condition_negative_vars_err': condition_negative_vars_err}
