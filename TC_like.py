@@ -271,51 +271,129 @@ def TCA_vec_old(X, Y, Z, nod_th=30, corr_th=0):
 
     return VAR_err, SNR, SNRdb, R, fMSE, flags
 
+
+def ETC_vec(X, Y, Z, nod_th=30, corr_th=0):
+    '''Edit TCA_vec_old without scaling the data'''
+
+    # 0. check the NaN and fill with NaN if any of X,Y, and Z value is nan.
+    combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
+    X[combined_nan_mask] = np.nan
+    Y[combined_nan_mask] = np.nan
+    Z[combined_nan_mask] = np.nan
+
+    # 1. calculation for the originial data
+    # Calculate covariance
+    cov_corr_results = hVec.cov_corr_three(X, Y, Z)
+    covXY = cov_corr_results.get('covXY')
+    covXZ = cov_corr_results.get('covXZ')
+    covYZ = cov_corr_results.get('covYZ')
+
+    corrXY = cov_corr_results.get('corrXY')
+    corrXZ = cov_corr_results.get('corrXZ')
+    corrYZ = cov_corr_results.get('corrYZ')
+
+    # 2. Vectorized TC calculatio
+    # No-Scale the data
+    Xs = X 
+    Ys = Y
+    Zs = Z
+    X=[]; Y=[]; Z=[];
+
+    # Calculate covariance with scaled Xs, Ys, and Zs
+    cov_corr_results_s = hVec.cov_corr_three(Xs, Ys, Zs)
+
+    covXXs = cov_corr_results_s.get('covXX')
+    covYYs = cov_corr_results_s.get('covYY')
+    covZZs = cov_corr_results_s.get('covZZ')
+    covXYs = cov_corr_results_s.get('covXY')
+    covXZs = cov_corr_results_s.get('covXZ')
+    covYZs = cov_corr_results_s.get('covYZ')
+
+    # Calculate correlation with scaled Xs, Ys, and Zs
+    corrXYs = cov_corr_results_s.get('corrXYs')
+    corrXZs = cov_corr_results_s.get('corrXZs')
+    corrYZs = cov_corr_results_s.get('corrYZs')
+
+    var_Xserr = covXXs - covXYs*covXZs/covYZs
+    var_Yserr = covYYs - covXYs*covYZs/covXZs
+    var_Zserr = covZZs - covXZs*covYZs/covXYs
+
+    # Calcuate TC numbers
+    SNR_Xs =  (covXYs * covXZs / covYZs) / var_Xserr
+    SNR_Ys =  (covXYs * covYZs / covXZs) / var_Yserr
+    SNR_Zs =  (covXZs * covYZs / covXYs) / var_Zserr
+
+    R_XYs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Ys)) ** 0.5
+    R_XZs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Zs)) ** 0.5
+    R_YZs = 1 / ((1 + 1/SNR_Ys) * (1 + 1/SNR_Zs)) ** 0.5
+
+    fMSE_Xs = 1 / (1 + SNR_Xs)
+    fMSE_Ys = 1 / (1 + SNR_Ys)
+    fMSE_Zs = 1 / (1 + SNR_Zs)
+
+    R_XXs = 1 / (1 + 1/SNR_Xs)
+    R_YYs = 1 / (1 + 1/SNR_Ys)
+    R_ZZs = 1 / (1 + 1/SNR_Zs)
+
+    SNRdb_Xs = 10 * np.log10(SNR_Xs)
+    SNRdb_Ys = 10 * np.log10(SNR_Ys)
+    SNRdb_Zs = 10 * np.log10(SNR_Zs)
+
+    VAR_err = {'x': var_Xserr, 'y': var_Yserr, 'z': var_Zserr}
+    SNR = {'x': SNR_Xs, 'y': SNR_Ys, 'z': SNR_Zs}
+    SNRdb = {'x': SNRdb_Xs, 'y': SNRdb_Ys, 'z': SNRdb_Zs}
+    R = {'x': R_XXs, 'y': R_YYs, 'z': R_ZZs}
+    fMSE = {'x': fMSE_Xs, 'y': fMSE_Ys, 'z': fMSE_Zs}
+
+    # 3. set the flags
+    # flag on non-scaled data
+    condition_corr = (corrXY < corr_th) | (corrXZ < corr_th) | (corrYZ < corr_th) #flag 1
+
+    # falg on scaled data
+    condition_n_valid = np.sum(~np.isnan(Xs) & ~np.isnan(Ys) & ~np.isnan(Zs), axis=2) < nod_th #flag 2
+    condition_fMSE = (fMSE_Xs < 0) | (fMSE_Ys < 0) | (fMSE_Zs < 0) | (fMSE_Xs > 1) | (fMSE_Ys > 1) | (fMSE_Zs > 1) #flag 3
+    condition_negative_vars_err  = (var_Xserr < 0) | (var_Yserr < 0) | (var_Zserr < 0) #flag 4
+
+    flags = {'condition_corr': condition_corr,
+            'condition_n_valid': condition_n_valid,
+            'condition_fMSE': condition_fMSE,
+            'condition_negative_vars_err': condition_negative_vars_err}
+
+    return VAR_err, SNR, SNRdb, R, fMSE, flags
+
+
+
 def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
+    original_shape = X.shape[:-1]  # Get the shape without the last dimension
+    original_size = np.prod(original_shape)
+
     # 0. Check for NaNs and ensure that any NaNs are consistent across datasets
     combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
     X[combined_nan_mask] = np.nan
     Y[combined_nan_mask] = np.nan
     Z[combined_nan_mask] = np.nan
 
-    # Remove completely NaN slices (if data is 3D)
-    valid_mask = ~np.isnan(X).all(axis=2) & ~np.isnan(Y).all(axis=2) & ~np.isnan(Z).all(axis=2)
-    X = X[valid_mask]
-    Y = Y[valid_mask]
-    Z = Z[valid_mask]
-
-    # 1. Flatten the data to 2D arrays if necessary
+    # Flatten the data to 2D arrays
     X_flat = X.reshape(-1, X.shape[-1])
     Y_flat = Y.reshape(-1, Y.shape[-1])
     Z_flat = Z.reshape(-1, Z.shape[-1])
 
-    # Remove rows with NaNs
-    valid_rows = ~np.isnan(X_flat).any(axis=1) & ~np.isnan(Y_flat).any(axis=1) & ~np.isnan(Z_flat).any(axis=1)
-    X_flat = X_flat[valid_rows]
-    Y_flat = Y_flat[valid_rows]
-    Z_flat = Z_flat[valid_rows]
-
-    # Combine the data into a single array
-    data = np.stack((X_flat, Y_flat, Z_flat), axis=1)  # Shape: (N, 3, T)
-
     # Initialize arrays to store results
-    N = data.shape[0]
-    errVar_ETC = np.zeros((N, 3))
-    rho2_ETC = np.zeros((N, 3))
-    SNR = np.zeros((N, 3))
-    SNRdb = np.zeros((N, 3))
+    errVar_ETC = np.full((original_size, 3), np.nan)
+    rho2_ETC = np.full((original_size, 3), np.nan)
+    SNR = np.full((original_size, 3), np.nan)
+    SNRdb = np.full((original_size, 3), np.nan)
 
     # Iterate over each time series (row)
-    for i in range(N):
-        y = data[i, :, :].T  # Shape: (T, 3)
+    for i in range(original_size):
+        y = np.column_stack((X_flat[i], Y_flat[i], Z_flat[i]))  # Shape: (T, 3)
+
+        # Remove NaNs
+        y = y[~np.isnan(y).any(axis=1)]
 
         # Check that there are enough valid observations
         if y.shape[0] < nod_th:
             continue  # Skip if not enough data
-
-        # Remove any remaining NaNs
-        if np.isnan(y).any():
-            continue  # Skip if there are NaNs
 
         # Compute covariance matrix
         Q_hat = np.cov(y, rowvar=False)
@@ -348,50 +426,49 @@ def TCA_vec(X, Y, Z, nod_th=30, corr_th=0):
             # Handle any mathematical errors (e.g., division by zero)
             continue
 
-    # Prepare outputs
+    # Reshape results back to original shape
     VAR_err = {
-        'x': errVar_ETC[:, 0],
-        'y': errVar_ETC[:, 1],
-        'z': errVar_ETC[:, 2]
+        'x': errVar_ETC[:, 0].reshape(original_shape),
+        'y': errVar_ETC[:, 1].reshape(original_shape),
+        'z': errVar_ETC[:, 2].reshape(original_shape)
     }
     SNR = {
-        'x': SNR[:, 0],
-        'y': SNR[:, 1],
-        'z': SNR[:, 2]
+        'x': SNR[:, 0].reshape(original_shape),
+        'y': SNR[:, 1].reshape(original_shape),
+        'z': SNR[:, 2].reshape(original_shape)
     }
     SNRdb = {
-        'x': SNRdb[:, 0],
-        'y': SNRdb[:, 1],
-        'z': SNRdb[:, 2]
+        'x': SNRdb[:, 0].reshape(original_shape),
+        'y': SNRdb[:, 1].reshape(original_shape),
+        'z': SNRdb[:, 2].reshape(original_shape)
     }
     R = {
-        'x': rho2_ETC[:, 0],
-        'y': rho2_ETC[:, 1],
-        'z': rho2_ETC[:, 2]
+        'x': rho2_ETC[:, 0].reshape(original_shape),
+        'y': rho2_ETC[:, 1].reshape(original_shape),
+        'z': rho2_ETC[:, 2].reshape(original_shape)
     }
     fMSE = {
-        'x': 1 - rho2_ETC[:, 0],
-        'y': 1 - rho2_ETC[:, 1],
-        'z': 1 - rho2_ETC[:, 2]
+        'x': (1 - rho2_ETC[:, 0]).reshape(original_shape),
+        'y': (1 - rho2_ETC[:, 1]).reshape(original_shape),
+        'z': (1 - rho2_ETC[:, 2]).reshape(original_shape)
     }
 
-    # 3. Set the flags
-    # Flag on non-scaled data (not necessary here as we didn't calculate corrXY)
-    # flags on correlation coefficients
-    condition_corr = (R['x'] < corr_th) | (R['y'] < corr_th) | (R['z'] < corr_th)  # flag 1
-    # flag on valid number of observations
-    condition_n_valid = np.sum(~np.isnan(X_flat) & ~np.isnan(Y_flat) & ~np.isnan(Z_flat), axis=1) < nod_th
-    # flags on fMSE
-    condition_fMSE = (fMSE['x'] < 0) | (fMSE['y'] < 0) | (fMSE['z'] < 0) | (fMSE['x'] > 1) | (fMSE['y'] > 1) | (fMSE['z'] > 1)  # flag 3
-    # flag on negative error variances
-    condition_negative_vars_err = (errVar_ETC < 0).any(axis=1)  # flag 4
+    # Set the flags
+    condition_corr = ((R['x'] < corr_th) | (R['y'] < corr_th) | (R['z'] < corr_th))
+    condition_n_valid = np.sum(~np.isnan(X) & ~np.isnan(Y) & ~np.isnan(Z), axis=-1) < nod_th
+    condition_fMSE = ((fMSE['x'] < 0) | (fMSE['y'] < 0) | (fMSE['z'] < 0) |
+                      (fMSE['x'] > 1) | (fMSE['y'] > 1) | (fMSE['z'] > 1))
+    condition_negative_vars_err = (errVar_ETC < 0).any(axis=1).reshape(original_shape)
 
-    flags = {'condition_corr': condition_corr,
-            'condition_n_valid': condition_n_valid,
-            'condition_fMSE': condition_fMSE,
-            'condition_negative_vars_err': condition_negative_vars_err}
+    flags = {
+        'condition_corr': condition_corr,
+        'condition_n_valid': condition_n_valid,
+        'condition_fMSE': condition_fMSE,
+        'condition_negative_vars_err': condition_negative_vars_err
+    }
 
     return VAR_err, SNR, SNRdb, R, fMSE, flags
+
 
 def ETC(D1, D2, D3, nod_th=30, corr_th=0):
     """
