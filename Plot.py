@@ -93,7 +93,8 @@ def plot_map_old(longitude, latitude, values, title, cmin, cmax, cmap='jet', bou
     
     return fig, ax
 
-def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, points=None):
+def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, cbar_ticks=None, cbar_extend=None, points=None, save_fig_path=None):
+
     """
     Plots a map with the given data, either globally or within specified longitude and latitude bounds.
 
@@ -127,7 +128,11 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
         (UTM is available but need to modify the code)
     - bounds: List or tuple of the format [lon_min, lon_max, lat_min, lat_max] for the map extent. If None, uses full range.
     - dem_path: Path to the DEM file for background in the plot (optional).
-    
+    - cbar_ticks: Colorbar ticks. Defaults to 'None' (Ex. [0, 0.5, 1])
+    - cbar_extend: Colorbar extend. Defaults to 'None' (Ex. 'both')
+    - points: Point indices to mark on the map. Defaults to 'None' (Ex. [(25, 10), (7, 35)])
+    - save_fig_path: Path to save the figure. Defaults to 'None' (Ex. './test.png')
+
     Returns:
     - fig, ax: Figure and axes objects of the plot.
     """
@@ -152,7 +157,7 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     else:
         extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
         ax.set_extent(extent, crs=ccrs.PlateCarree())
-    
+
     # Plot DEM as background if provided
     if dem_path:
         with rasterio.open(dem_path) as dem:
@@ -165,7 +170,7 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
     ax.coastlines()
     ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
-   
+
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='black', alpha=0.5, linestyle='--')
     gl.top_labels = False
     gl.right_labels = False
@@ -174,11 +179,18 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     gl.xlabel_style = {'size': 15, 'color': 'black'}
     gl.ylabel_style = {'size': 15, 'color': 'black'}
 
-    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
+    # Add colorbar and enforce color limits
+    if cbar_extend == None:
+        cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
+    else: # min, max, both
+        cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5, extend=cbar_extend)
     cbar.set_label(label_title)
+
+    if cbar_ticks != None:
+        cbar.set_ticks(cbar_ticks)
+
+    # Ensure the color limits are set correctly on the image
     im.set_clim(cmin, cmax)
-    cbar.locator = ticker.MaxNLocator(nbins=3) # set number of bins in colorbar
-    cbar.update_ticks()
 
     # Mark the specified point if provided
     if points:
@@ -188,8 +200,12 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
             lat = latitude[pixel_y, pixel_x]
             ax.plot(lon, lat, marker='*', color='red', markersize=10, transform=ccrs.PlateCarree())
 
+    if save_fig_path is not None:
+        plt.tight_layout()
+        plt.savefig(save_fig_path, dpi=300, bbox_inches='tight', transparent=True)
+
     plt.show()
-    
+
     return fig, ax
 
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
@@ -379,7 +395,7 @@ def plot_LULC_map_copernicus(longitude, latitude, rds, title, region=None):
     plt.tight_layout()
     plt.show()
 
-def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12C1 LULC map', projection='Mollweide', bounds=None):
+def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12C1 LULC map', projection='Mollweide', bounds=None, save_fig_path=None):
     """
     Plots MCD12C1 land cover data directly from given longitude, latitude, and LULC values,
     applying color mapping based on the LULC type.
@@ -486,6 +502,10 @@ def plot_LULC_map_MCD12C1(longitude, latitude, values, lulc_type=1, title='MCD12
     legend_patches = [mpatches.Patch(color=cmap_colors[i], label=labels[i]) for i in range(len(labels))]
     # Display the legend in 4 columns as requested
     legend = ax.legend(handles=legend_patches, title='Land Cover Classes', loc='upper center', bbox_to_anchor=(0.5, -0.1), fancybox=True, shadow=False, ncol=3)
+
+    if save_fig_path != None:
+        plt.tight_layout()
+        plt.savefig(save_fig_path, dpi=300, bbox_inches='tight')
 
     plt.show()
 
@@ -619,4 +639,93 @@ def plot_kde_scatter(y_train_true, y_train_pred, y_test_true, y_test_pred):
     plt.tight_layout()
     plt.show()
 
+def plot_kde_scatter_log_count(y_train_true, y_train_pred, y_test_true, y_test_pred, fontsize=20, global_min=None, global_max=None):
+    plt.rc('font', family='Serif')
 
+    if global_min == None:
+        global_min = min(min(y_train_true), min(y_train_pred), min(y_test_true), min(y_test_pred))
+    if global_max == None:
+        global_max = max(max(y_train_true), max(y_train_pred), max(y_test_true), max(y_test_pred))
+
+    """
+    This function creates a scatter plot to evaluate ML model performance with respect to train and test dataset.
+    """
+    def bin_count_scatter(x, y, ax=None, sort=True, bins=20, **kwargs):
+        """
+        Scatter plot colored by the number of points in a bin with a threshold at 80% and exceeding values in yellow
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+        data, x_e, y_e = np.histogram2d(x, y, bins=bins)  # Calculate bin counts
+        z = interpn((0.5*(x_e[1:] + x_e[:-1]), 0.5*(y_e[1:]+y_e[:-1])), data, np.vstack([x,y]).T, method="splinef2d", bounds_error=False)
+
+        # To be sure to plot all data
+        z[np.where(np.isnan(z))] = 0.0
+
+        # Sort the points by number of points in each bin, so that the densest points are plotted last
+        if sort:
+            idx = z.argsort()
+            x, y, z = x[idx], y[idx], z[idx]
+
+        # Calculate 80% threshold of bin counts
+        max_z = np.max(z)
+        threshold = 0.8 * max_z
+
+        # Set up normalization with LogNorm and threshold
+        norm = colors.LogNorm(vmin=1, vmax=threshold)  # vmin set to 1 to avoid issues with log(0)
+
+        # Set up colormap
+        cmap = cm.plasma
+        cmap.set_over('yellow')
+
+        # Scatter plot
+        sc = ax.scatter(x, y, c=z, norm=norm, cmap=cmap, **kwargs)
+        cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, extend='max')
+        sc.set_clim(1, threshold)
+        cbar.cmap.set_over('yellow')
+
+        # Adjust the color bar ticks to represent bin counts in log scale
+        log_ticks = np.logspace(np.log10(1), np.log10(threshold), num=5)
+        cbar.set_ticks(log_ticks)
+        cbar.set_ticklabels([f'{int(val)}' for val in log_ticks])
+        cbar.ax.set_title('Bin Counts', fontsize=fontsize)
+
+        return ax
+
+    # Plotting training and test results with bin count scatter
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+
+    # Define the ticks for x and y axis
+    x_ticks = np.linspace(global_min, global_max, 5)
+    y_ticks = np.linspace(global_min, global_max, 5)
+
+    # Training results
+    mae_train = np.mean(np.abs(y_train_true - y_train_pred))
+    ax_train = bin_count_scatter(y_train_true, y_train_pred, ax=axes[0], bins=[30, 30])
+    axes[0].plot([global_min, global_max], [global_min, global_max], 'k--', lw=2)
+    axes[0].set_xlabel('Actual Values', fontsize=fontsize)
+    axes[0].set_ylabel('Predicted Values', fontsize=fontsize)
+    axes[0].set_title('Train Data', fontsize=fontsize)
+    axes[0].grid(True)
+    axes[0].set_xticks(x_ticks)
+    axes[0].set_yticks(y_ticks)
+    # Display MAE in upper left
+    axes[0].text(0.05, 0.95, f'MAE = {mae_train:.6f}', transform=axes[0].transAxes,
+                 fontsize=fontsize, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.8))
+
+    # Test results
+    mae_test = np.mean(np.abs(y_test_true - y_test_pred))
+    ax_test = bin_count_scatter(y_test_true, y_test_pred, ax=axes[1], bins=[30, 30])
+    axes[1].plot([global_min, global_max], [global_min, global_max], 'k--', lw=2)
+    axes[1].set_xlabel('Actual Values', fontsize=fontsize)
+    axes[1].set_ylabel('Predicted Values', fontsize=fontsize)
+    axes[1].set_title('Test Data', fontsize=fontsize)
+    axes[1].grid(True)
+    axes[1].set_xticks(x_ticks)
+    axes[1].set_yticks(y_ticks)
+    # Display MAE in upper left
+    axes[1].text(0.05, 0.95, f'MAE = {mae_test:.6f}', transform=axes[1].transAxes,
+                 fontsize=fontsize, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.8))
+
+    plt.tight_layout()
+    plt.show()
