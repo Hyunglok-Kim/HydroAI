@@ -74,7 +74,7 @@ def replace_fill_value(data, fill_value):
     data[data == fill_value] = np.nan
     return data
 
-def create_array_from_nc(file_list, data_doy, year, variable_name):
+def create_array_from_nc_old(file_list, data_doy, year, variable_name):
     # Read data from the first NC file
     nc_data = netCDF4.Dataset(file_list[0])
     fill_value = np.float64(nc_data.variables[variable_name]._FillValue)
@@ -116,6 +116,49 @@ def create_array_from_nc(file_list, data_doy, year, variable_name):
         data_array = apply_scale_offset(data_array, add_offset, scale_factor)
 
     return data_array, longitude, latitude
+
+def create_array_from_nc(file_list, year, variable_name):
+    # Read data from the first NC file
+    nc_data = netCDF4.Dataset(file_list[0])
+    fill_value = np.float64(nc_data.variables[variable_name]._FillValue)
+    t_data        = np.flipud(nc_data.variables[variable_name][:])
+    x, y = t_data.shape[:2]
+
+    doy_max = 366 if calendar.isleap(year) else 365
+
+    # Create the array filled with NaN
+    data_array = np.empty((x, y, doy_max + 1))
+    data_array[:] = np.nan
+    data_doy = []
+    # Loop over the file list
+    for nc_file in file_list:
+        # Read data from the NC file
+        nc_data = netCDF4.Dataset(nc_file)
+        t_data = np.flipud(nc_data.variables[variable_name][:])
+
+        # Get the corresponding doy value from the data_doy list
+        doy = int(nc_file.split('/')[-2]) # nc_file structure: [CATDS_path]/[year]/[doy]/[nc_file].nc (-2 means [doy])
+        data_doy.append(doy)
+
+        # Assign the data to the array
+        data_array[:, :, doy] = t_data
+
+        # Close the NC file
+        nc_data.close()
+
+    nc_data = netCDF4.Dataset(file_list[0])
+    lat = np.flipud(nc_data.variables['lat'][:])
+    lon = (nc_data.variables['lon'][:])
+    longitude, latitude = np.meshgrid(lon, lat)
+
+    data_array = replace_fill_value(data_array, fill_value)
+
+    if variable_name == 'RFI_Prob':
+        add_offset    = nc_data.variables[variable_name].add_offset
+        scale_factor  = nc_data.variables[variable_name].scale_factor
+        data_array = apply_scale_offset(data_array, add_offset, scale_factor)
+
+    return data_array, longitude, latitude, data_doy
 
 def create_netcdf_file(nc_file, longitude, latitude, **data_vars):
     """
