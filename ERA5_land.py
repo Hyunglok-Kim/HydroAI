@@ -25,9 +25,9 @@ def preprocess_lon_lat(lon, lat):
 def correct_shape(var_data):
     # Transpose due to ERA5's raw shape is (12, 1801, 3600) = (month, lat, lon)
     var_data = np.transpose(var_data, (1,2,0))
-    # Rearrange (180~360) into (-180~0)
-    var_data_0_180 = var_data[:,:1800,:]
-    var_data_180_0 = var_data[:,1800:,:]
+    lon_size = np.shape(var_data)[1]
+    var_data_0_180 = var_data[:,:lon_size//2,:]
+    var_data_180_0 = var_data[:,lon_size//2:,:]
     var_data = np.concatenate((var_data_180_0, var_data_0_180), axis=1)
 
     return var_data
