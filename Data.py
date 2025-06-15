@@ -420,58 +420,65 @@ def is_uniform(array, axis):
         
 def find_closest_index(lon_2d, lat_2d, coord):
     """
-    Find the closest indices (lon_idx, lat_idx) in a 2D grid of longitude and latitude values.
+    Find the closest indices in a 2D grid of longitude and latitude values to given coordinates.
 
     Parameters:
-    lon_2d (np.ndarray): 2D array of longitudes with shape [n_lat, n_lon] (x-direction: columns).
-    lat_2d (np.ndarray): 2D array of latitudes with shape [n_lat, n_lon] (y-direction: rows).
-    coord (tuple or np.ndarray): A single tuple (lon, lat) or an array of shape (N, 2) with (lon, lat) pairs.
+    lon_2d (np.ndarray): 2D array of longitude values.
+    lat_2d (np.ndarray): 2D array of latitude values.
+    coords (tuple or np.ndarray): A tuple or 2D array containing the longitude and latitude 
+                                  of the target coordinates (lon_value, lat_value) or 
+                                  [(lon_value1, lat_value1), (lon_value2, lat_value2), ...].
 
     Returns:
-    tuple or list of tuples:
-        If one coordinate is given, returns (lon_idx, lat_idx).
-        If multiple, returns a list of (lon_idx, lat_idx) tuples.
+    list of tuples: A list containing tuples of the indices (lat_idx, lon_idx) of the closest grid points.
 
-    Notes:
-    - Assumes latitude varies along rows and longitude varies along columns.
-    - Uses fast indexing for uniform grids; falls back to KDTree for general grids.
+    Explanation:
+    The function first checks if the rows of `lon_2d` are uniform and the columns of `lat_2d` are uniform.
+    If both conditions are met, it indicates that the grid is uniform, and the process speed is greatly increased
+    due to direct indexing. If the grids are not uniform, the function uses a KDTree for nearest-neighbor search,
+    which is computationally more intensive.
+    
+    REVISION HISTORY: 
+    2 June 2024 Hyunglok Kim; initial specification
+    16 Aug 2024 Hyunglok Kim; support for vectorization in uniform grids for more than one coords
     """
 
-    # Normalize input format
+    # Ensure coord is in the form of an array
     if isinstance(coord, tuple):
         lon_values = np.array([coord[0]])
         lat_values = np.array([coord[1]])
-        single_input = True
     else:
-        lon_values = coord[:, 0]
-        lat_values = coord[:, 1]
-        single_input = False
+        lon_values, lat_values = coord[:, 0], coord[:, 1]
 
-    # Case 1: Uniform grid — fast indexing
     if np.all(is_uniform(lon_2d, axis=1)) and np.all(is_uniform(lat_2d, axis=0)):
         lon_start = lon_2d[0, 0]
         lat_start = lat_2d[0, 0]
         lon_step = lon_2d[0, 1] - lon_2d[0, 0]
         lat_step = lat_2d[1, 0] - lat_2d[0, 0]
-
+        
         lon_indices = np.round((lon_values - lon_start) / lon_step).astype(int)
         lat_indices = np.round((lat_values - lat_start) / lat_step).astype(int)
-
-    # Case 2: Irregular grid — use KDTree
+    
     else:
         lon_flat = lon_2d.flatten()
         lat_flat = lat_2d.flatten()
-        coords_grid = np.vstack((lon_flat, lat_flat)).T
-        tree = cKDTree(coords_grid)
+        coordinates = np.vstack((lon_flat, lat_flat)).T
+        tree = cKDTree(coordinates)
         dists, idxs = tree.query(np.vstack((lon_values, lat_values)).T)
         lat_indices, lon_indices = np.unravel_index(idxs, lon_2d.shape)
-
-    # Return consistent (lon_idx, lat_idx)
-    if single_input:
-        return int(lon_indices[0]), int(lat_indices[0])
-    else:
-        return list(zip(lon_indices, lat_indices))
     
+    # If only one coordinate was provided, return the first (and only) index
+    if len(lon_indices) == 1:
+        return lon_indices[0], lat_indices[0]
+    else:
+        return lon_indices, lat_indices
+
+# Example usage:
+# lon_2d = np.array([...])  # Some 2D array of longitudes
+# lat_2d = np.array([...])  # Some 2D array of latitudes
+# coords = [(lon1, lat1), (lon2, lat2), ...]  # A list of coordinate tuples
+# indices = find_closest_index(lon_2d, lat_2d, coords)
+
 def extract_region_from_data(longitude, latitude, X, bounds):
     """
     Create a subset of a 3D array based on given latitude and longitude bounds.
