@@ -23,6 +23,7 @@ from rasterio.plot import show
 from tqdm import tqdm
 from PIL import Image
 import rioxarray
+import imageio
 
 from HydroAI.Data import get_variable_from_nc
 from HydroAI.Data import Resampling
@@ -729,3 +730,86 @@ def plot_kde_scatter_log_count(y_train_true, y_train_pred, y_test_true, y_test_p
 
     plt.tight_layout()
     plt.show()
+
+def generate_MP4_rotating_globe(nc_lon, nc_lat, data_3d, vmin, vmax, output_mp4, plot_title,
+                                cbar_title=None, frame_duration=0.1, lons_center=np.arange(-180, 180, 10),
+                                init_time_idx=0, time_step=1, time_length_per_rotation=1,
+                                cmap='YlGnBu', background_color='white',
+                                dpi=150, codec='libx264', bitrate='4000k'):
+    """
+    Generate a rotating Earth MP4 video of a 3D data array.
+
+    Args:
+    - nc_lon (numpy.ndarray): Longitude array of the data.
+    - nc_lat (numpy.ndarray): Latitude array of the data.
+    - data_3d (numpy.ndarray): 3D data array to be visualized.
+    - vmin (float): Minimum value for the color scale.
+    - vmax (float): Maximum value for the color scale.
+    - output_mp4 (str): Path to save the output MP4 file.
+    - plot_title (str): Title of the plot.
+    - cbar_title (str): Title of the color bar.
+    - frame_duration (float): Duration of each frame in seconds.
+    - lons_center (numpy.ndarray): Longitude values at which to center the plot.
+    - init_time_idx (int): Index of the initial time step.
+    - time_step (int): Time step between frames.
+    - time_length_per_rotation (int): Number of time steps per rotation.
+    - cmap (str): Colormap to use for the plot.
+    - background_color (str): Background color of the plot.
+    - dpi (int): DPI of the plot.
+    - codec (str): Codec to use for the MP4 file.
+    - bitrate (str): Bitrate of the MP4 file.
+    """
+    fps = max(1, int(round(1.0 / frame_duration)))
+    writer = imageio.get_writer(
+        output_mp4, fps=fps, codec=codec, bitrate=bitrate, pixelformat='yuv420p'
+    )
+    if background_color == 'black': text_color = 'white'
+    else: text_color = 'black'
+
+    time_idx = init_time_idx
+    try:
+        for lon0 in tqdm(lons_center, desc="Rendering frames (MP4)"):
+            for _ in range(time_length_per_rotation):
+                data = data_3d[:, :, time_idx]
+
+                fig = plt.figure(figsize=(6, 6), dpi=dpi, facecolor=background_color)
+                ax = plt.axes(
+                    projection=ccrs.Orthographic(central_longitude=lon0, central_latitude=20),
+                    facecolor=background_color
+                )
+                ax.set_global()
+                ax.coastlines(color='black', linewidth=0.5)
+                ax.stock_img()
+
+                mesh = ax.pcolormesh(
+                    nc_lon, nc_lat, data,
+                    transform=ccrs.PlateCarree(),
+                    cmap=cmap, vmin=vmin, vmax=vmax,
+                )
+
+                if cbar_title is not None:
+                    cbar = plt.colorbar(mesh, ax=ax, orientation='horizontal',
+                                        fraction=0.046, pad=0.04, extend='both')
+                    cbar.set_label(cbar_title, color=text_color)
+                    cbar.ax.tick_params(labelcolor=text_color)
+
+                ax.gridlines(draw_labels=False, linewidth=0.3, color='gray', linestyle='--')
+                ax.set_title(plot_title, fontsize=20, color=text_color)
+
+                fig.canvas.draw()
+                w, h = fig.canvas.get_width_height()
+                try:
+                    buf = fig.canvas.tostring_rgb()
+                except AttributeError: # Due to the version of matplotlib
+                    buf = fig.canvas.buffer_rgba()
+                    buf = np.asarray(buf)  # ensures numpy array if needed (for older versions)
+                frame = np.frombuffer(buf, dtype=np.uint8).reshape(h, w, -1)[..., :3]
+                writer.append_data(frame)
+                plt.close(fig)
+
+                time_idx += time_step
+
+    finally:
+        writer.close()
+
+    print(f"MP4 saved to {output_mp4} (fps={fps}, codec={codec})")
