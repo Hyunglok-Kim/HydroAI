@@ -585,6 +585,77 @@ def create_netcdf_file(nc_file, longitude, latitude, time_arg='doy', **data_vars
         latitude (np.array): 2D array of latitude values.
         longitude (np.array): 2D array of longitude values.
         data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
+                          Each item can be:
+                            var_name = data_array
+                            var_name = (data_array, units_string)
+        time_arg (str): Name of time axis.
+    """
+
+    nc_data = netCDF4.Dataset(nc_file, 'w')
+
+    # Define the dimensions
+    rows, cols = latitude.shape
+
+    sample_var = next(iter(data_vars.values()))
+    if isinstance(sample_var, tuple):
+        sample_var = sample_var[0]
+
+    if sample_var.ndim == 1:
+        time = sample_var.shape[0]
+    elif sample_var.ndim == 2:
+        time = 1
+    else:
+        time = sample_var.shape[2]
+
+    # Create dimensions
+    nc_data.createDimension('latitude', rows)
+    nc_data.createDimension('longitude', cols)
+    nc_data.createDimension(time_arg, time)
+
+    # Latitude / Longitude
+    lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
+    lon_var = nc_data.createVariable('longitude', 'f4', ('latitude', 'longitude'))
+    lat_var[:] = latitude
+    lon_var[:] = longitude
+    lat_var.units = 'degrees_north'
+    lon_var.units = 'degrees_east'
+
+    # Create variables in data_vars
+    for var_name, var_info in data_vars.items():
+        # Check if user passed (data, units)
+        if isinstance(var_info, tuple):
+            var_data, var_units = var_info
+        else:
+            var_data = var_info
+            var_units = None  # No unit provided
+
+        # Variable type & dimensions
+        if var_data.ndim == 1:
+            dtype = 'i4' if isinstance(var_data[0], np.int64) else 'f4'
+            nc_var = nc_data.createVariable(var_name, dtype, (time_arg,))
+        else:
+            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', time_arg))
+
+        # Assign data
+        nc_var[:] = var_data
+
+        # Assign units if available
+        if var_units is not None:
+            nc_var.units = var_units
+
+    nc_data.close()
+    print(f"NetCDF file {nc_file} created successfully with units.")
+
+
+def create_netcdf_file_old(nc_file, longitude, latitude, time_arg='doy', **data_vars):
+    """
+    Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
+
+    Args:
+        nc_file (str): Path to the output NetCDF file.
+        latitude (np.array): 2D array of latitude values.
+        longitude (np.array): 2D array of longitude values.
+        data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
         time_arg (str): Name of time axis.
 
     Returns:
