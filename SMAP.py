@@ -14,6 +14,7 @@ import h5py
 import netCDF4
 from tqdm import tqdm
 import calendar
+import HydroAI.Grid as hGrid
 
 def extract_filelist_doy(directory, year):
     """
@@ -99,7 +100,7 @@ def get_e2grid(cpuserver_data_FP, mission_product):
 
     return longitude, latitude
 
-def create_array_from_h5(file_list, data_doy, year, cpuserver_data_FP, mission_product, variable_name, group_name):
+def create_array_from_h5(file_list, data_doy, year, cpuserver_data_FP, mission_product, variable_name, group_name, resolution_key='36km'):
     """
     Creates a 3D numpy array from a list of .h5 files containing variable data for each DOY.
 
@@ -161,6 +162,10 @@ def create_array_from_h5(file_list, data_doy, year, cpuserver_data_FP, mission_p
                 data_array[:, :, data_doy[i]] = np.nan
 
     # Get EASE2 lat/lon from the get_e2grid function
-    longitude, latitude = get_e2grid(cpuserver_data_FP, mission_product)
+    if resolution_key: 
+        #longitude, latitude = get_e2grid(cpuserver_data_FP, mission_product)
+        longitude, latitude = hGrid.generate_lon_lat_e2grid(resolution_key=resolution_key)
+    else:
+        longitude, latitude = None, None
     
     return data_array, longitude, latitude
