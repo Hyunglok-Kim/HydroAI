@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import ListedColormap
 from matplotlib import cm
-from matplotlib.colors import Normalize 
+from matplotlib import colors
 from scipy.interpolate import interpn
 import matplotlib.ticker as ticker
+import matplotlib.gridspec as gridspec
 
 import cartopy
 import cartopy.crs as ccrs
@@ -24,6 +25,7 @@ from tqdm import tqdm
 from PIL import Image
 import rioxarray
 import imageio
+import warnings
 
 from HydroAI.Data import get_variable_from_nc
 from HydroAI.Data import Resampling
@@ -94,7 +96,7 @@ def plot_map_old(longitude, latitude, values, title, cmin, cmax, cmap='jet', bou
     
     return fig, ax
 
-def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, cbar_ticks=None, cbar_extend=None, points=None, save_fig_path=None):
+def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, cbar_ticks=None, cbar_extend=None, cbar_norm=None, points=None, save_fig_path=None, ax=None):
 
     """
     Plots a map with the given data, either globally or within specified longitude and latitude bounds.
@@ -131,13 +133,16 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
     - dem_path: Path to the DEM file for background in the plot (optional).
     - cbar_ticks: Colorbar ticks. Defaults to 'None' (Ex. [0, 0.5, 1])
     - cbar_extend: Colorbar extend. Defaults to 'None' (Ex. 'both')
+    - cbar_norm: Colorbar normalization. Defaults to 'None' (Ex. 'log')
     - points: Point indices to mark on the map. Defaults to 'None' (Ex. [(25, 10), (7, 35)])
     - save_fig_path: Path to save the figure. Defaults to 'None' (Ex. './test.png')
+    - ax: an ax object for the plot. Defaults to 'None'. If 'None', `ax` is created. If None, a new figure is created and displayed. If provided, the function returns the axes for manual updates.
 
     Returns:
     - fig, ax: Figure and axes objects of the plot.
     """
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': getattr(ccrs, projection)()}, dpi=150)
     #fig.suptitle(plot_title, fontsize=16, y=0.67)
     #fig.suptitle(plot_title, fontsize=16, y=0.69)
     #fig.suptitle(plot_title, fontsize=16)
@@ -182,13 +187,16 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
 
     # Add colorbar and enforce color limits
     if cbar_extend == None:
-        cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
+        cbar = ax.figure.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5)
     else: # min, max, both
-        cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5, extend=cbar_extend)
+        cbar = ax.figure.colorbar(im, ax=ax, orientation='horizontal', pad=0.05, shrink=0.5, extend=cbar_extend)
     cbar.set_label(label_title)
 
     if cbar_ticks != None:
         cbar.set_ticks(cbar_ticks)
+
+    if cbar_norm == 'log':
+        im.set_norm(colors.LogNorm(vmin=cmin, vmax=cmax, clip=True))
 
     # Ensure the color limits are set correctly on the image
     im.set_clim(cmin, cmax)
@@ -205,9 +213,10 @@ def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_
         plt.tight_layout()
         plt.savefig(save_fig_path, dpi=300, bbox_inches='tight', transparent=True)
 
-    plt.show()
+    if ax is None:
+        plt.show()
 
-    return fig, ax
+    return ax.figure, ax
 
 def plot_global_map(longitude, latitude, values, title, cmin, cmax, cmap='jet'):
     # Create a new figure and axes with a Plate Carrée projection
@@ -611,7 +620,7 @@ def plot_kde_scatter(y_train_true, y_train_pred, y_test_true, y_test_pred):
             x, y, z = x[idx], y[idx], z[idx]
 
         sc = ax.scatter(x, y, c=z, **kwargs)
-        norm = Normalize(vmin=np.min(z), vmax=np.max(z))
+        norm = colors.Normalize(vmin=np.min(z), vmax=np.max(z))
         cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.viridis), ax=ax)
 
         return ax
@@ -813,3 +822,146 @@ def generate_MP4_rotating_globe(nc_lon, nc_lat, data_3d, vmin, vmax, output_mp4,
         writer.close()
 
     print(f"MP4 saved to {output_mp4} (fps={fps}, codec={codec})")
+
+
+def plot_map_w_latitudinal_mean(nc_lon, nc_lat, values, cmin=None, cmax=None, cmap='jet', label_title='values', projection='Mollweide', bounds='global', ax_line_width=0.15):
+    """Plots a geographical map alongside its corresponding latitudinal mean profile.
+
+    This function creates a two-panel figure: the left panel shows a global or regional map of the data, and the right panel displays the zonal (latitudinal) mean with a shaded area representing the standard deviation.
+
+    Args:
+    - nc_lon (numpy.ndarray): Longitude 2D coordinates.
+    - nc_lat (numpy.ndarray): Latitude 2D coordinates.
+    - values (numpy.ndarray): 2D data array to be plotted, indexed as [lat, lon].
+    - cmin (float, optional): Minimum value for the colorbar and x-axis of the line plot. Defaults to the minimum of the data if None.
+    - cmax (float, optional): Maximum value for the colorbar and x-axis of the line plot. Defaults to the maximum of the data if None.
+    - cmap (str, optional): Matplotlib colormap name. Defaults to 'jet'.
+    - label_title (str, optional): Label for the colorbar and the x-axis of the line plot. Defaults to 'values'.
+    - projection (str, optional): The name of the Cartopy projection class (e.g., 'Mollweide', 'PlateCarree'). Defaults to 'Mollweide'.
+    - bounds (str or list, optional): The geographic extent of the map. Can be 'global' or a list of [lon_min, lon_max, lat_min, lat_max]. Defaults to 'global'.
+    - ax_line_width (float, optional): Relative width of the right-hand line plot axis. Defaults to 0.15.
+
+    Returns:
+    tuple: (fig, ax)
+    - fig (matplotlib.figure.Figure): The generated figure object.
+    - ax (matplotlib.axes.Axes): The last active axes object in the plotting loop.
+    """
+    warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+    if cmin is None:
+        cmin = np.nanmin(values)
+    if cmax is None:
+        cmax = np.nanmax(values)
+
+    fig = plt.figure(figsize=(10, 5))
+    gs = gridspec.GridSpec(1, 2, width_ratios=[5, 1], wspace=0.0)
+
+    fig.set_constrained_layout_pads(
+        w_pad=0.0,
+        wspace=0.0,
+    )
+
+    # ax: global map
+    ax_map = fig.add_subplot(gs[0], projection=getattr(ccrs, projection)())
+    plot_map(nc_lon, nc_lat, values, cmin, cmax, label_title=label_title, bounds=bounds, cmap=cmap, projection=projection, ax=ax_map)
+
+    # ax: latitudinal mean line
+    ax_line = fig.add_subplot(gs[1])
+    map_pos = ax_map.get_position()
+    ax_line.set_position([
+        map_pos.x1 + 0.01,
+        map_pos.y0,
+        0.15,               # width of ax_line
+        map_pos.height
+    ])
+
+    # right - aligned with ax_map
+    proj_map = ax_map.projection
+    pc = ccrs.PlateCarree()
+    gl_map = ax_map.gridlines()
+    y_min, y_max = ax_map.get_ylim()
+    ax_line.set_ylim(y_min, y_max)
+
+    # right - data
+    pts = proj_map.transform_points(pc, np.zeros_like(nc_lat[:, 0]), nc_lat[:, 0])
+    y_coords = pts[:, 1]
+    lat_mean = np.nanmean(values, axis=1)
+    lat_std = np.nanstd(values, axis=1)
+    ax_line.plot(lat_mean, y_coords, color='navy', lw=2)
+    ax_line.fill_betweenx(y_coords, lat_mean - lat_std, lat_mean + lat_std, color='navy', alpha=0.2, edgecolor='navy')
+
+    # right - yticks
+    def lat_formatter(y, pos):
+        lat = pc.transform_point(0, y, proj_map)[1]
+        return gridliner.LATITUDE_FORMATTER.format_data(lat)
+    yticks = np.array(gl_map.ylocator.tick_values(*ax_map.get_ylim()))
+    yticks_transformed = proj_map.transform_points(pc, np.zeros_like(yticks), yticks)[:, 1]
+    ax_line.yaxis.set_major_locator(ticker.FixedLocator(yticks_transformed))
+    ax_line.yaxis.set_major_formatter(plt.FuncFormatter(lat_formatter))
+    ax_line.yaxis.tick_right()
+    ax_line.yaxis.set_label_position("right")
+
+    # right - xticks
+    ax_line.xaxis.set_major_locator(ticker.MaxNLocator(3))
+    ax_line.set_xlim(cmin, cmax)
+    x_ticks = ax_line.xaxis.get_majorticklocs()
+    x_ticks = x_ticks[~np.isclose(x_ticks, cmin)]
+    ax_line.xaxis.set_major_locator(ticker.FixedLocator(x_ticks))
+
+    # grid
+    ax_line.grid(True, linestyle='--', alpha=.6)
+
+    # colorbar
+    for ax in fig.axes:
+        if ax not in [ax_map, ax_line]:
+            pos = ax.get_position()
+            ax.set_position([pos.x0, pos.y0 - 0.05, pos.width, pos.height])
+    return fig, ax
+
+
+def generate_gif(plot_func, longitude, latitude, values, save_file='./gif.gif', fps=10, *args, **kwargs):
+    """Generates an animated GIF by iteratively calling a plotting function over a time-dimensioned array.
+
+    This function automatically detects the time axis, generates individual frames as temporary 
+    PNG files, compiles them into a GIF using imageio, and cleans up the temporary files.
+
+    Args:
+    - plot_func (callable): A custom plotting function that accepts (longitude, latitude, values, *args, **kwargs) and returns a matplotlib Figure object.
+    - longitude (numpy.ndarray): 2D array of longitude values (e.g., -180 to 180).
+    - latitude (numpy.ndarray): 2D array of latitude values.
+    - values (numpy.ndarray): 3D data array. Supported shapes are (time, lat, lon) or (lat, lon, time).
+    - save_file (str, optional): The output path and filename for the GIF. Defaults to './gif.gif'.
+    - fps (float, optional): the number of frames in a second. Defaults to 10.
+    - *args: Variable length argument list passed to the `plot_func`.
+    - **kwargs: Arbitrary keyword arguments passed to the `plot_func`.
+    """
+    save_path = os.path.dirname(save_file)
+    os.makedirs(save_path, exist_ok=True)
+    if values[:, :, 0].shape == latitude.shape:
+        axis_time = 2
+    elif values[0, :, :].shape == latitude.shape:
+        axis_time = 0
+    else:
+        raise ValueError('Not match shape values and latitude')
+
+    num_frames = values.shape[axis_time]
+
+    temp_files = []
+    for t in tqdm(range(num_frames)):
+        data = values[t, :, :] if axis_time == 0 else values[:, :, t]
+        fig, ax = plot_func(longitude, latitude, data, *args, **kwargs)
+
+        temp_file = f'{save_path}/temp_frame_{t:04d}.png'
+        plt.savefig(temp_file, dpi=300, bbox_inches='tight', facecolor='white')
+        temp_files.append(temp_file)
+        plt.close(fig)
+
+    print("making gif file...")
+    with imageio.get_writer(save_file, mode='I', fps=fps, loop=0) as writer:
+        for filename in sorted(temp_files):
+            image = imageio.imread(filename)
+            writer.append_data(image)
+    for filename in temp_files:
+        os.remove(filename)
+    print(f"done! {save_file} is created.")
+    return
