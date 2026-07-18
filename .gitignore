@@ -1,3 +1,26 @@
+# Python
 **/__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Jupyter
 **/.ipynb_checkpoints
+
+# Editors / OS
 **/*.swp
+.DS_Store
+.vscode/
+.idea/
+
+# Data & outputs (keep data out of git; use external storage)
+*.nc
+*.nc4
+*.h5
+*.he5
+*.hdf
+*.mat
+*.gif
+*.mp4
+*.csv
