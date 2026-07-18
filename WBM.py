@@ -4,6 +4,7 @@ import os
 from os.path import exists
 import re
 import sys
+import copy
 from scipy.stats import boxcox as bc
 from datetime import datetime, timedelta
 import time
@@ -562,7 +563,8 @@ def make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP
     
     # rescale SM
     SSM_save, noscale_SSM_NLDAS, TR_it, masking_day, sample_rate = rescale_SM(SSM_SMAPL3, SSM_NLDAS, P, TR_argument)
-    #SSM_save_or = rescale_SM(SSM_SMAPL3, SSM_NLDAS, P, TR_argument)[0]
+    # keep a pre-noise copy; the default (else) branch below builds *_or columns from it
+    SSM_save_or = copy.deepcopy(SSM_save)
 
     # add Gaussian noise
     for i in range(TR_it):
@@ -1069,16 +1071,16 @@ def fitting(SSM_SMAPL3, SSM_NLDAS, P, R, ET, cell_id, case, method, TR, GN_std, 
             
             df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
             
-            p, dsm, dsm_or, SM1, SM2, dt, r, asm, et, infilt, res = make_input(df, case)
-            idata, valid, lam = make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, asm, et, infilt, res, case, method, event_opt) 
+            p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res = make_input(df, case)
+            idata, valid, lam = make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res, case, method, event_opt)
             save_idata(idata, valid, lam, case, method, TR, GN_std, save_dir, cell_id)
             return idata, valid, lam, df
         
     else:
         TR_argument = [TR, sub_opt, div_opt, sample_rate_opt] #TR, consider subsample (same TR), diversity, sample_rate
         df = make_df(SSM_SMAPL3, SSM_NLDAS, P, R, ET, case, TR_argument, GN_std, input_FP, file_names, dth, p_threshold, event_opt)[0]
-        p, dsm, dsm_or, SM1, SM2, dt, r, asm, et, infilt, res = make_input(df, case)
-        idata, valid, lam = make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, asm, et, infilt, res, case, method, event_opt)
+        p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res = make_input(df, case)
+        idata, valid, lam = make_idata(p, dsm, dsm_or, SM1, SM2, dt, r, et, asm, infilt, res, case, method, event_opt)
         return idata, valid, lam, df
 
 ### idata-related codes

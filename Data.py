@@ -997,8 +997,8 @@ def UTC_to_LT(data_FP, target_local_time, lon, year, doy, var_name, layer_index=
     desc = f"{doy_to_yearyyyymmdd(year, doy)} at {target_local_time}±{time_interval} local time"
     
     for i in tqdm(t_nc_file_paths, desc=desc, unit='file'):
-        t_var = get_variable_from_nc(i, var_name, layer_index=layer_index, flip_data='False')
-        t_UTC_time = get_variable_from_nc(i, 'time', layer_index=0, flip_data='False')
+        t_var = get_variable_from_nc(i, var_name, layer_index=layer_index, flip_data=False)
+        t_UTC_time = get_variable_from_nc(i, 'time', layer_index=0, flip_data=False)
         
         # Convert observed minutes to a datetime object
         t_UTC_time = reference_time + timedelta(minutes=t_UTC_time[0])

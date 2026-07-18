@@ -51,9 +51,10 @@ def load_mat_file(mat_file, path):
 
 def load_porosity_mat(mat_file):
     print('This function will be deprecated since HydroAI no longer depends on MATLAB files.')
-    if os.path.exists(mat_file):
-        data = scipy.io.loadmat(mat_file)
-        variables = {}
+    if not os.path.exists(mat_file):
+        raise FileNotFoundError(f"MAT file not found: {mat_file}")
+    data = scipy.io.loadmat(mat_file)
+    variables = {}
     for var_name in data:
         variables[var_name] = data[var_name]
     return variables

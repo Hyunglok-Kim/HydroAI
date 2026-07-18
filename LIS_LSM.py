@@ -106,7 +106,7 @@ def get_variable_from_nc(nc_file_path, variable_name, layer_index=0, flip_data=T
                 data = variable[:]
             elif variable.ndim == 0:
                 # Extract scalar value for 0D variables
-                data = variable.scalar()
+                data = variable.getValue()
             else:
                 raise ValueError(f"Variable '{variable_name}' has unsupported number of dimensions: {variable.ndim}.")
 

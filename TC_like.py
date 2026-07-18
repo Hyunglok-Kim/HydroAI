@@ -1,6 +1,20 @@
 import numpy as np
 import HydroAI.Vectorization as hVec
 
+def CDF_match(data):
+    """
+    CDF-match data[:, 1] to the distribution of the reference in data[:, 0].
+
+    :param data: (N, 2) array; column 0 is the reference series, column 1 the series to rescale.
+    :return: (N,) array of column-1 values rescaled to the reference distribution.
+    """
+    ref = data[:, 0]
+    src = data[:, 1]
+    sorted_src = np.sort(src)
+    quantiles = np.searchsorted(sorted_src, src, side='right') / len(sorted_src)
+    quantiles = np.clip(quantiles, 0, 1)
+    return np.quantile(np.sort(ref), quantiles)
+
 def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
     
     avail_D1 = ~np.isnan(D1)
@@ -45,7 +59,6 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
             ref = REF[index1[i], index2[i], :]
             DATA = np.column_stack((DATA, ref))
 
-        iok = np.isnan(np.sum(DATA, axis=1))
         tmp = np.sum(DATA, axis=1)
         iok = (~np.isnan(tmp))
 
@@ -59,9 +72,9 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
         else:
             inok = np.isnan(tmp)
             DATA[inok, :] = np.nan
-            X = CDF_match(np.column_stack((DATA[iok, 4], DATA[iok, 0])))
-            Y = CDF_match(np.column_stack((DATA[iok, 4], DATA[iok, 1])))
-            Z = CDF_match(np.column_stack((DATA[iok, 4], DATA[iok, 2])))
+            X = CDF_match(np.column_stack((DATA[iok, 3], DATA[iok, 0])))
+            Y = CDF_match(np.column_stack((DATA[iok, 3], DATA[iok, 1])))
+            Z = CDF_match(np.column_stack((DATA[iok, 3], DATA[iok, 2])))
 
         L = len(X)
         X = X.reshape((L, 1))
