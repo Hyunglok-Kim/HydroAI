@@ -77,7 +77,6 @@ def Bayesian_optimization_RF(X_train, y_train, pbounds, n_iter=20, cv=10, seed=0
                                       min_samples_split=round(min_samples_split),
                                       random_state=seed,
                                       n_jobs=n_jobs)
-        model.fit(X_train, y_train)
         score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
         return score
 
@@ -87,7 +86,6 @@ def Bayesian_optimization_RF(X_train, y_train, pbounds, n_iter=20, cv=10, seed=0
                      max_depth=round(max_depth),
                      min_samples_split=round(min_samples_split),
                      n_streams=1, random_state=seed) # n_stream & random_state: For reproducible
-        model.fit(X_train, y_train)
         score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
         return score
 
@@ -174,8 +172,6 @@ def Bayesian_optimization_SVM(X_train, y_train, pbounds, n_iter=20, cv=10, seed=
                     gamma=gamma,
                     degree=round(degree),
                     kernel='rbf')  # You can change this to 'linear', 'poly', 'sigmoid' as needed.
-        model.fit(X_train, y_train)
-
         # Perform cross-validation using cuML's cross_val_score
         score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
         return score
@@ -228,8 +224,6 @@ def Bayesian_optimization_LGBM(X_train, y_train, pbounds, n_iter=20, cv=10, seed
                                   n_jobs=-1,
                                   verbose=-1)  # Suppress warnings and messages
 
-        model.fit(X_train, y_train)
-
         # Perform cross-validation using sklearn's cross_val_score
         score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
         return score
@@ -272,7 +266,6 @@ def Bayesian_optimization_ElasticNet(X_train, y_train, pbounds, n_iter=20, cv=10
 
     def ElasticNet_cuml(alpha, l1_ratio):
         model = cuML_ElasticNet(alpha=alpha, l1_ratio=l1_ratio)
-        model.fit(X_train, y_train)
 
         # Perform cross-validation using cuML's cross_val_score
         score = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring).mean()
