@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydroai"
+version = "0.2.0"
+description = "Hydrological data analysis toolkit of the HydroAI Laboratory (GIST)"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "HydroAI Laboratory, GIST", email = "hyunglokkim@gmail.com" },
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "netCDF4",
+    "h5py",
+    "pyhdf",
+    "tqdm",
+    "tabulate",
+    "ease-lonlat",
+    "cartopy",
+    "rasterio",
+    "rioxarray",
+    "imageio",
+    "Pillow",
+    "multiprocess; sys_platform != 'darwin'",
+]
+
+[project.optional-dependencies]
+# Shallow_ML.py (GPU acceleration via cuml is NOT pip-installable; install
+# RAPIDS via conda if needed — the module works without it)
+ml = [
+    "scikit-learn",
+    "statsmodels",
+    "xgboost",
+    "lightgbm",
+    "bayesian-optimization",
+]
+# WBM.py Bayesian fitting
+bayes = [
+    "pymc",
+    "arviz",
+    "seaborn",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -2,6 +2,34 @@ name: hydroai
 channels:
   - conda-forge
 dependencies:
+  - python>=3.9
   - jupyterlab
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - netcdf4
+  - h5py
   - pyhdf
-prefix: /opt/homebrew/Caskroom/miniforge/base/envs/hydroai
+  - tqdm
+  - tabulate
+  - cartopy
+  - rasterio
+  - rioxarray
+  - imageio
+  - pillow
+  # ML (Shallow_ML.py)
+  - scikit-learn
+  - statsmodels
+  - xgboost
+  - lightgbm
+  - bayesian-optimization
+  # Bayesian water-balance model (WBM.py)
+  - pymc
+  - arviz
+  - seaborn
+  - pip
+  - pip:
+      - ease-lonlat
+      - multiprocess
+      - -e .
