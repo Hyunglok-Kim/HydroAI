@@ -4,14 +4,7 @@ ERA5_land.py: A module for processing reanalysis ERA5-based soil moisture data.
 (for monthly dataset)
 
 """
-import os
-import glob
-import datetime
 import numpy as np
-import h5py
-import netCDF4
-from tqdm import tqdm
-import calendar
 
 def preprocess_lon_lat(lon, lat):
     # lat, lon edit for standard data shape

@@ -1,8 +1,6 @@
 import os
-import os
 import re
 
-from scipy import ndimage
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -27,9 +25,9 @@ import rioxarray
 import imageio
 import warnings
 
-from HydroAI.Data import get_variable_from_nc
-from HydroAI.Data import Resampling
-import HydroAI.Data as Data
+from .Data import get_variable_from_nc
+from .Data import Resampling
+from . import Data
 
 # Set default font sizes using rcParams to ensure consistency
 plt.rcParams['grid.linewidth'] = 1
@@ -37,64 +35,6 @@ plt.rcParams['axes.titlesize'] = 15  # Title size
 plt.rcParams['axes.labelsize'] = 15  # Axis labels (x, y)
 plt.rcParams['xtick.labelsize'] = 15 # X tick labels
 plt.rcParams['ytick.labelsize'] = 15 # Y tick labels
-
-def plot_map_old(longitude, latitude, values, title, cmin, cmax, cmap='jet', bounds=None, dem_path=None):
-    """
-    Plots a map with the given data, either globally or within specified longitude and latitude bounds.
-
-    Args:
-    - longitude: 2D array of longitude values.
-    - latitude: 2D array of latitude values.
-    - values: 2D array of data values to plot.
-    - title: Title for the colorbar and plot.
-    - cmin, cmax: Minimum and maximum values for the colorbar.
-    - cmap: Colormap to use for plotting data.
-    - bounds: List or tuple of the format [lon_min, lon_max, lat_min, lat_max] for the map extent. If None, uses full range.
-    - dem_path: Path to the DEM file for background in the plot (optional).
-    
-    Returns:
-    - fig, ax: Figure and axes objects of the plot.
-    """
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': ccrs.PlateCarree()})
-    
-    # Calculate the extent from the longitude and latitude
-    extent = [longitude.min(), longitude.max(), latitude.min(), latitude.max()]
-    
-    # Set map extent if bounds are provided, else use the calculated extent
-    if bounds:
-        ax.set_extent(bounds, crs=ccrs.PlateCarree())
-    else:
-        ax.set_extent(extent, crs=ccrs.PlateCarree())
-
-    # Plot DEM as background if provided
-    if dem_path:
-        with rasterio.open(dem_path) as dem:
-            dem_data = dem.read(1)  # Read the first band
-            dem_extent = [dem.bounds.left, dem.bounds.right, dem.bounds.bottom, dem.bounds.top]
-            ax.imshow(dem_data, origin='upper', extent=dem_extent, transform=ccrs.PlateCarree(), cmap='terrain', alpha=0.5)
-
-    # Plot the data using imshow instead of pcolormesh
-    #im = ax.imshow(values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax, extent=extent, origin='upper', interpolation='nearest')
-    im = ax.pcolormesh(longitude, latitude, values, transform=ccrs.PlateCarree(), cmap=cmap, vmin=cmin, vmax=cmax)
-    ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
-    ax.coastlines()
-    ax.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='black')
-   
-    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=1, color='black', alpha=0.5, linestyle='--')
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xformatter = gridliner.LONGITUDE_FORMATTER
-    gl.yformatter = gridliner.LATITUDE_FORMATTER
-    gl.xlabel_style = {'size': 15, 'color': 'black'}
-    gl.ylabel_style = {'size': 15, 'color': 'black'}
-
-    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.1, shrink=0.5)
-    cbar.set_label(title)
-    im.set_clim(cmin, cmax)
-
-    plt.show()
-    
-    return fig, ax
 
 def plot_map(longitude, latitude, values, cmin, cmax, plot_title='title', label_title='values', cmap='jet', projection='Mollweide', bounds=None, dem_path=None, cbar_ticks=None, cbar_extend=None, cbar_norm=None, points=None, save_fig_path=None, ax=None):
 

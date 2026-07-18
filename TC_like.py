@@ -1,5 +1,5 @@
 import numpy as np
-import HydroAI.Vectorization as hVec
+from . import Vectorization as hVec
 
 def CDF_match(data):
     """
@@ -192,99 +192,6 @@ def TCA(D1, D2, D3, nod_th=20, corr_th=0.1, REF=None):
 
     return VAR_err, SNR, SNRdb, R, fMSE
 
-def TCA_vec_old(X, Y, Z, nod_th=30, corr_th=0):
-
-    # 0. check the NaN and fill with NaN if any of X,Y, and Z value is nan.
-    combined_nan_mask = np.isnan(X) | np.isnan(Y) | np.isnan(Z)
-    X[combined_nan_mask] = np.nan
-    Y[combined_nan_mask] = np.nan
-    Z[combined_nan_mask] = np.nan
-    
-    # 1. calculation for the originial data
-    # Calculate covariance
-    cov_corr_results = hVec.cov_corr_three(X, Y, Z)
-    covXY = cov_corr_results.get('covXY')
-    covXZ = cov_corr_results.get('covXZ')
-    covYZ = cov_corr_results.get('covYZ')
-    
-    corrXY = cov_corr_results.get('corrXY')
-    corrXZ = cov_corr_results.get('corrXZ')
-    corrYZ = cov_corr_results.get('corrYZ')
-    
-    # 2. Vectorized TC calculation
-    # Scale the data
-    c1 = 1
-    c2 = np.nansum(X*Z, axis=2) / np.nansum(Y*Z, axis=2)
-    c3 = np.nansum(X*Y, axis=2) / np.nansum(Z*Y, axis=2)
-    
-    Xs = c1 * X
-    Ys = np.expand_dims(c2, axis=2) * Y
-    Zs = np.expand_dims(c3, axis=2) * Z
-    X=[]; Y=[]; Z=[];
-    
-    # Calculate covariance with scaled Xs, Ys, and Zs
-    cov_corr_results_s = hVec.cov_corr_three(Xs, Ys, Zs)
-    
-    covXXs = cov_corr_results_s.get('covXX')
-    covYYs = cov_corr_results_s.get('covYY')
-    covZZs = cov_corr_results_s.get('covZZ')
-    covXYs = cov_corr_results_s.get('covXY')
-    covXZs = cov_corr_results_s.get('covXZ')
-    covYZs = cov_corr_results_s.get('covYZ')
-    
-    # Calculate correlation with scaled Xs, Ys, and Zs
-    corrXYs = cov_corr_results_s.get('corrXYs')
-    corrXZs = cov_corr_results_s.get('corrXZs')
-    corrYZs = cov_corr_results_s.get('corrYZs')
-    
-    var_Xserr = covXXs - covXYs*covXZs/covYZs
-    var_Yserr = covYYs - covXYs*covYZs/covXZs
-    var_Zserr = covZZs - covXZs*covYZs/covXYs
-    
-    # Calcuate TC numbers
-    SNR_Xs =  (covXYs * covXZs / covYZs) / var_Xserr
-    SNR_Ys =  (covXYs * covYZs / covXZs) / var_Yserr
-    SNR_Zs =  (covXZs * covYZs / covXYs) / var_Zserr
-    
-    R_XYs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Ys)) ** 0.5
-    R_XZs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Zs)) ** 0.5
-    R_YZs = 1 / ((1 + 1/SNR_Ys) * (1 + 1/SNR_Zs)) ** 0.5
-    
-    fMSE_Xs = 1 / (1 + SNR_Xs)
-    fMSE_Ys = 1 / (1 + SNR_Ys)
-    fMSE_Zs = 1 / (1 + SNR_Zs)
-    
-    R_XXs = 1 / (1 + 1/SNR_Xs)
-    R_YYs = 1 / (1 + 1/SNR_Ys)
-    R_ZZs = 1 / (1 + 1/SNR_Zs)
-    
-    SNRdb_Xs = 10 * np.log10(SNR_Xs)
-    SNRdb_Ys = 10 * np.log10(SNR_Ys)
-    SNRdb_Zs = 10 * np.log10(SNR_Zs)
-    
-    VAR_err = {'x': var_Xserr, 'y': var_Yserr, 'z': var_Zserr}
-    SNR = {'x': SNR_Xs, 'y': SNR_Ys, 'z': SNR_Zs}
-    SNRdb = {'x': SNRdb_Xs, 'y': SNRdb_Ys, 'z': SNRdb_Zs}
-    R = {'x': R_XXs, 'y': R_YYs, 'z': R_ZZs}
-    fMSE = {'x': fMSE_Xs, 'y': fMSE_Ys, 'z': fMSE_Zs}
-    
-    # 3. set the flags
-    # flag on non-scaled data
-    condition_corr = (corrXY < corr_th) | (corrXZ < corr_th) | (corrYZ < corr_th) #flag 1
-    
-    # falg on scaled data
-    condition_n_valid = np.sum(~np.isnan(Xs) & ~np.isnan(Ys) & ~np.isnan(Zs), axis=2) < nod_th #flag 2
-    condition_fMSE = (fMSE_Xs < 0) | (fMSE_Ys < 0) | (fMSE_Zs < 0) | (fMSE_Xs > 1) | (fMSE_Ys > 1) | (fMSE_Zs > 1) #flag 3
-    condition_negative_vars_err  = (var_Xserr < 0) | (var_Yserr < 0) | (var_Zserr < 0) #flag 4
-    
-    flags = {'condition_corr': condition_corr, 
-            'condition_n_valid': condition_n_valid,
-            'condition_fMSE': condition_fMSE,
-            'condition_negative_vars_err': condition_negative_vars_err}
-
-    return VAR_err, SNR, SNRdb, R, fMSE, flags
-
-
 def ETC_vec(X, Y, Z, nod_th=30, corr_th=0):
     '''Edit TCA_vec_old without scaling the data'''
 
@@ -322,11 +229,6 @@ def ETC_vec(X, Y, Z, nod_th=30, corr_th=0):
     covXZs = cov_corr_results_s.get('covXZ')
     covYZs = cov_corr_results_s.get('covYZ')
 
-    # Calculate correlation with scaled Xs, Ys, and Zs
-    corrXYs = cov_corr_results_s.get('corrXYs')
-    corrXZs = cov_corr_results_s.get('corrXZs')
-    corrYZs = cov_corr_results_s.get('corrYZs')
-
     var_Xserr = covXXs - covXYs*covXZs/covYZs
     var_Yserr = covYYs - covXYs*covYZs/covXZs
     var_Zserr = covZZs - covXZs*covYZs/covXYs
@@ -335,10 +237,6 @@ def ETC_vec(X, Y, Z, nod_th=30, corr_th=0):
     SNR_Xs =  (covXYs * covXZs / covYZs) / var_Xserr
     SNR_Ys =  (covXYs * covYZs / covXZs) / var_Yserr
     SNR_Zs =  (covXZs * covYZs / covXYs) / var_Zserr
-
-    R_XYs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Ys)) ** 0.5
-    R_XZs = 1 / ((1 + 1/SNR_Xs) * (1 + 1/SNR_Zs)) ** 0.5
-    R_YZs = 1 / ((1 + 1/SNR_Ys) * (1 + 1/SNR_Zs)) ** 0.5
 
     fMSE_Xs = 1 / (1 + SNR_Xs)
     fMSE_Ys = 1 / (1 + SNR_Ys)

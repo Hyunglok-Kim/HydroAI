@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 import os
 
-import HydroAI.Grid as hGrid
-import HydroAI.Data as hData
+from . import Grid as hGrid
+from . import Data as hData
 
 # Define the majority filter function
 def majority_filter(data, size=3, nodata=-9999):

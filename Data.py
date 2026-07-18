@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import time
-import atexit
 import platform
 from scipy.interpolate import interp1d
 from scipy.ndimage import zoom
@@ -17,21 +16,12 @@ from netCDF4 import Dataset
 from tabulate import tabulate
 import h5py
 
-import matplotlib.pyplot as plt
-
 from pyhdf.SD import SD, SDC
 
 if platform.system() == 'Darwin':  # macOS
-    import multiprocessing as mp
     from multiprocessing import Pool
 else:  # assume Linux or other Unix-like system
-    import multiprocess as mp
     from multiprocess import Pool
-    
-#def clear_cache():
-#    load_data("", "", 0, clear_cache=True)
-#    print("Cache cleared")
-#atexit.register(clear_cache)
 
 def create_3d_object_array(x, y, z):
     """
@@ -110,7 +100,6 @@ def load_data(input_fp, file_name, engine="c", clear_cache=False):
 
         except FileNotFoundError:
             print(f"File not found: {input_fp + file_name}")
-            flag = 0
             return [], []
     
     end_time = time.time()
@@ -119,15 +108,6 @@ def load_data(input_fp, file_name, engine="c", clear_cache=False):
     columns = data.columns
     
     return data, columns
-
-#def mode_function(x):
-#    return x.mode().iloc[0]
-
-def mode_function(x):
-    mode_val = x.mode()
-    if not mode_val.empty:
-        return mode_val.iloc[0]
-    return np.nan
 
 def gini_simpson(values):
     if values.empty or values.isna().all():
@@ -145,75 +125,6 @@ def magnify_VAR(lon_input, lat_input, VAR, mag_factor):
     #print("After magnification (lat, lon, value shape):", m_lat.shape, m_lon.shape, m_values.shape)
     return m_lon, m_lat, m_values
 
-def Resampling_test(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method, agg_method='mean', mag_factor=3):
-    #--------------------------BEGIN NOTE------------------------------%
-    # University of Virginia
-    # USDA
-    # HydroAI lab in GIST
-    #--------------------------END NOTE--------------------------------%
-    # ARGUMENTS:
-    # lat_target/ lon_target : Target frame lat/lon data (m x n arrays)
-    # lat_input / lon_input : Satellite lat/lon data (m' x n' arrays)
-    # (NOTE: lat(i,1)>lat(i+1,1) (1<=i<=(size(lat_main,1)-1))
-    #        lon(1,i)<lon(1,i+1) (1<=i<=(size(lon_main,2)-1)) )
-    #
-    # VAR : Satellite's variable (m' x n' array)
-    # method: Method for resampling: (e.g., 'nearest')
-    #
-    # sampling_method: determines the interpolation method or algorithm to be used
-    #             (e.g., linear, nearest, zero, slinear, quadratic, cubic)
-    # agg_method: determines the interpolation order to use when resizing the input array
-    #             (e.g., mean, median, mode, min, max)
-    #
-    # DESCRIPTION:
-    # This code resampled earth coordinates of the specified domain for 
-    # any "target" projection
-    #
-    # REVISION HISTORY: 
-    # 2 Jul 2020 Hyunglok Kim; initial specification in Matlab
-    # 16 May 2023 Hyunglok Kim; converted to Python code
-    # 17 Apr 2024 Hyunglok Kim; algorithm updated with cKDTree algorithm
-    #-----------------------------------------------------------------%
-
-    s_target = lat_target.shape
-    s_input = lat_input.shape
-
-    if mag_factor > 1:
-        lon_input, lat_input, VAR = magnify_VAR(lon_input, lat_input, VAR, mag_factor)
-
-    # Flatten the coordinate arrays
-    coords_input = np.column_stack([lat_input.ravel(), lon_input.ravel()])
-    coords_target = np.column_stack([lat_target.ravel(), lon_target.ravel()])
-
-    # Build KDTree from target coordinates
-    tree = cKDTree(coords_target)
-
-    # Query KDTree to find the nearest target index for each input coordinate
-    distances, indices = tree.query(coords_input)
-
-    # Create a DataFrame for aggregation
-    df = pd.DataFrame({
-        'values': VAR.ravel(),
-        'indices': indices  # This maps each input value to its nearest target cell
-    })
-
-    # Aggregate the data
-    if agg_method == 'mode':
-        agg_values = df.groupby('indices')['values'].agg(lambda x: pd.Series.mode(x).iloc[0])
-    elif agg_method == 'count':
-        agg_values = df.groupby('indices')['values'].count()  # Correct usage of count
-    elif agg_method == 'gini_simpson':
-        agg_values = df.groupby('indices')['values'].agg(gini_simpson)  # Using the custom function
-    else:
-        agg_values = df.groupby('indices')['values'].agg(agg_method)
-
-    # Prepare the result array
-    VAR_r = np.full(lat_target.shape, np.nan)
-    for idx, value in agg_values.items():
-        np.put(VAR_r, idx, value)  # Assign aggregated values to their corresponding indices in the result array
-
-    return VAR_r
-    
 def Resampling(lon_target, lat_target, lon_input, lat_input, VAR, sampling_method='nearest', agg_method='mean', mag_factor=2):
     '''
     --------------------------BEGIN NOTE------------------------------%
@@ -375,30 +286,6 @@ def moving_average_3d(data, window_size, mode='+-', min_valid_fraction=0.3):
     
     return moving_averaged
 
-
-#def moving_average_3d(data, window_size):
-#    m, n, z = data.shape
-#    padding = window_size // 2  # Number of elements to pad on each side
-#    
-#    # Pad the data with NaN values to handle the edges
-#    padded_data = np.pad(data, ((0, 0), (0, 0), (padding, padding)), mode='constant', constant_values=np.nan)
-#    
-#    # Create an array to store the moving averaged values
-#    moving_averaged = np.zeros((m, n, z))
-#    
-#    # Calculate the moving average for each row and pixel
-#    # This code can be modified not to average already "moving averaged" values
-#    # This code can be modified not to average if there is less than certain numbers of valid points
-#    for k in range(z):
-#        moving_averaged[:, :, k] = np.nanmean(padded_data[:, :, k:k+window_size], axis=2)
-#    
-#    return moving_averaged
-
-def find_closest_index_old(longitudes, latitudes, point):
-    lon_lat = np.c_[longitudes.ravel(), latitudes.ravel()]
-    tree = cKDTree(lon_lat)
-    dist, idx = tree.query(point, k=1)
-    return np.unravel_index(idx, latitudes.shape)
 
 def is_uniform(array, axis):
     """
@@ -646,75 +533,6 @@ def create_netcdf_file(nc_file, longitude, latitude, time_arg='doy', **data_vars
     nc_data.close()
     print(f"NetCDF file {nc_file} created successfully with units.")
 
-
-def create_netcdf_file_old(nc_file, longitude, latitude, time_arg='doy', **data_vars):
-    """
-    Creates a NetCDF file from the provided data arrays and latitude/longitude grids.
-
-    Args:
-        nc_file (str): Path to the output NetCDF file.
-        latitude (np.array): 2D array of latitude values.
-        longitude (np.array): 2D array of longitude values.
-        data_vars (dict): Dictionary of 3D data arrays to include in the NetCDF file.
-        time_arg (str): Name of time axis.
-
-    Returns:
-        None
-    """
-    # Create a new NetCDF file
-    nc_data = netCDF4.Dataset(nc_file, 'w')
-
-    # Define the dimensions
-    rows, cols = latitude.shape
-    # Assuming all data variables have the same 'time' dimension size
-    if next(iter(data_vars.values())).ndim == 1:
-        time = next(iter(data_vars.values())).shape[0]
-    elif next(iter(data_vars.values())).ndim == 2:
-        time = 1
-    else:
-        time = next(iter(data_vars.values())).shape[2]
-
-    # Create dimensions in the NetCDF file
-    nc_data.createDimension('latitude', rows)
-    nc_data.createDimension('longitude', cols)
-    nc_data.createDimension(time_arg, time)
-
-    # Create latitude and longitude variables
-    lat_var = nc_data.createVariable('latitude', 'f4', ('latitude', 'longitude'))
-    lon_var = nc_data.createVariable('longitude', 'f4', ('latitude', 'longitude'))
-
-    # Assign data to the latitude and longitude variables
-    lat_var[:] = latitude
-    lon_var[:] = longitude
-
-    # Create variables and assign data for each item in data_vars
-    for var_name, var_data in data_vars.items():
-        # Create variable in NetCDF file
-        if var_data.ndim == 1:
-            if isinstance(var_data[0], np.int64):
-                nc_var = nc_data.createVariable(var_name, 'i4', (time_arg, ))
-            else:
-                nc_var = nc_data.createVariable(var_name, 'f4', (time_arg, ))
-        else:  
-            nc_var = nc_data.createVariable(var_name, 'f4', ('latitude', 'longitude', time_arg))
-        # Assign data to the variable
-        nc_var[:] = var_data
-
-    # Close the NetCDF file
-    nc_data.close()
-
-    print(f"NetCDF file {nc_file} created successfully.")
-
-# Example usage
-#hData.create_netcdf_file(
-#        nc_file    = nc_file_name,
-#        latitude   = domain_lat,
-#        longitude  = domain_lon,
-#        study_dates = study_dates,                   # 1D list of integer such as [20240101, 20240102, ...]
-#        Resampled_SMOS_SM    = Resampled_SMOS_SM,
-#        Resampled_SMOS_SM_QC = Resampled_SMOS_SM_QC,
-#        time_arg = 'dates_yymmdd'                       # Default argument is 'doy'. This argument means name of time axis.
-#        )
 
 def get_nc_variable_names_units(nc_file_path):
     """

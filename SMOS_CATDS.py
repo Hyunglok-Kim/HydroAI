@@ -5,9 +5,6 @@ import os
 import tarfile
 import glob
 import datetime
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature
 
 def extract_tgz_files(root_dir, year):
     """
@@ -73,49 +70,6 @@ def apply_scale_offset(data, add_offset, scale_factor):
 def replace_fill_value(data, fill_value):
     data[data == fill_value] = np.nan
     return data
-
-def create_array_from_nc_old(file_list, data_doy, year, variable_name):
-    # Read data from the first NC file
-    nc_data = netCDF4.Dataset(file_list[0])
-    fill_value = np.float64(nc_data.variables[variable_name]._FillValue)
-    #print(nc_data.variables)
-    t_data        = np.flipud(nc_data.variables[variable_name][:])
-    x, y = t_data.shape[:2]
-
-    doy_max = 366 if calendar.isleap(year) else 365
-
-    # Create the array filled with NaN
-    data_array = np.empty((x, y, doy_max + 1))
-    data_array[:] = np.nan
-
-    # Loop over the file list
-    for i, nc_file in enumerate(file_list):
-        # Read data from the NC file
-        nc_data = netCDF4.Dataset(nc_file)
-        t_data = np.flipud(nc_data.variables[variable_name][:])
-    
-        # Get the corresponding doy value from the data_doy list
-        doy = data_doy[i]
-
-        # Assign the data to the array
-        data_array[:, :, doy] = t_data
-
-        # Close the NC file
-        nc_data.close()
-    
-    nc_data = netCDF4.Dataset(file_list[0])
-    lat = np.flipud(nc_data.variables['lat'][:])
-    lon = (nc_data.variables['lon'][:])
-    longitude, latitude = np.meshgrid(lon, lat)
-   
-    data_array = replace_fill_value(data_array, fill_value)
-    
-    if variable_name == 'RFI_Prob':
-        add_offset    = nc_data.variables[variable_name].add_offset
-        scale_factor  = nc_data.variables[variable_name].scale_factor
-        data_array = apply_scale_offset(data_array, add_offset, scale_factor)
-
-    return data_array, longitude, latitude
 
 def create_array_from_nc(file_list, year, variable_name):
     # Read data from the first NC file

@@ -7,58 +7,17 @@ from the processed data.
 """
 
 import os
-import glob
-import datetime
 import numpy as np
 import h5py
-import netCDF4
 from tqdm import tqdm
 import calendar
-import HydroAI.Grid as hGrid
+
+from . import Grid as hGrid
+from . import readers_common
 
 def extract_filelist_doy(directory, year):
-    """
-    Extracts a list of .h5 files and their corresponding day of the year (DOY) from a directory.
-
-    Args:
-        directory (str): The directory containing .h5 files organized in 'yyyy.mm.dd' subdirectories.
-        year (int): The year for which the files are to be extracted.
-
-    Returns:
-        tuple: Two lists, one of file paths and one of corresponding DOYs.
-    """
-    data = []
-
-    # Iterate over the subdirectories within the specified directory
-    for subdir in os.listdir(directory):
-        sub_dir_path = os.path.join(directory, subdir)
-        
-        # Check if the item is a directory and matches the 'yyyy.mm.dd' format
-        if os.path.isdir(sub_dir_path) and len(subdir) == 10 and subdir[4] == '.' and subdir[7] == '.':
-            # Convert the 'yyyy.mm.dd' format to 'yyyy-mm-dd'
-            date_str = '-'.join(subdir.split('.'))
-            # Convert the date string to a datetime object
-            date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d')
-
-            # Process only if the year matches the specified year
-            if date_obj.year == year:
-                # Search for .h5 files within the subdirectory
-                h5_files = glob.glob(os.path.join(sub_dir_path, '*.h5'))
-
-                # Get the day of the year (DOY) number
-                doy = date_obj.timetuple().tm_yday
-
-                # Append file paths and corresponding DOY to the data list
-                for file in h5_files:
-                    data.append((file, doy))
-
-    # Sort the data list based on DOY (and date)
-    data.sort(key=lambda x: x[1])
-
-    # Unzip the sorted data into separate lists
-    file_list, data_doy = zip(*data) if data else ([], [])
-
-    return file_list, data_doy
+    """List .h5 files and their DOY from 'yyyy.mm.dd' subdirectories."""
+    return readers_common.extract_filelist_doy(directory, year, ext='h5')
 
 def get_e2grid(cpuserver_data_FP, mission_product):
     """

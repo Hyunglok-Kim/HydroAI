@@ -1,21 +1,22 @@
-import numpy as np
 import pandas as pd
-import tqdm
-import matplotlib.pyplot as plt
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 # ML packages
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import accuracy_score, make_scorer, mean_squared_error
+from sklearn.metrics import make_scorer, mean_squared_error
 from bayes_opt import BayesianOptimization
 import xgboost as xgb
-import cuml
-from cuml.ensemble import RandomForestRegressor as cuRF
-from cuml.svm import SVR
 import lightgbm as lgb
-from cuml.linear_model import ElasticNet as cuML_ElasticNet
+
+# cuml needs an NVIDIA GPU; import lazily so the module still works without one
+try:
+    from cuml.ensemble import RandomForestRegressor as cuRF
+    from cuml.svm import SVR
+    from cuml.linear_model import ElasticNet as cuML_ElasticNet
+except ImportError:
+    cuRF = SVR = cuML_ElasticNet = None
 
 
 
